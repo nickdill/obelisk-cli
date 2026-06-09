@@ -1,0 +1,6 @@
+obelisk
+obelisk-darwin-*
+obelisk-linux-*
+*.env
+.env
+.claude/
