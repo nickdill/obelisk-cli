@@ -4,3 +4,4 @@ obelisk-linux-*
 *.env
 .env
 .claude/
+docker-compose.override.yml

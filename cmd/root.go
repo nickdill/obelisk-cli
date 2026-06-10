@@ -46,4 +46,5 @@ func init() {
 	rootCmd.AddCommand(downCmd)
 	rootCmd.AddCommand(debugCmd)
 	rootCmd.AddCommand(updateCmd)
+	rootCmd.AddCommand(uninstallCmd)
 }

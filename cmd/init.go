@@ -64,7 +64,9 @@ func runInit(cmd *cobra.Command, args []string) error {
 		_, statErr := os.Stat(full)
 		alreadyExists := statErr == nil
 
-		if alreadyExists && (path == "obelisk.yml" || !initForce) {
+		// always preserve obelisk.yml; preserve other files unless --force
+		shouldSkip := alreadyExists && (path == "obelisk.yml" || !initForce)
+		if shouldSkip {
 			fmt.Printf("  skip   %s\n", path)
 			continue
 		}
@@ -78,7 +80,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if initForce {
+	if initForce && !initModuleMode {
 		doneMsg = "Scripts updated to latest version. obelisk.yml was not changed."
 	}
 	fmt.Println("\n" + doneMsg)
@@ -209,8 +211,8 @@ services:
 YAML
 
 echo "$modules" | while read -r name; do
-    image=$(yq e ".modules.${name}.image" "$CONFIG_FILE")
-    port=$(yq e ".modules.${name}.port" "$CONFIG_FILE")
+    image=$(yq e ".modules[\"${name}\"].image" "$CONFIG_FILE")
+    port=$(yq e ".modules[\"${name}\"].port" "$CONFIG_FILE")
     cat >> docker-compose.override.yml << YAML
   ${name}:
     image: ${image}
@@ -233,10 +235,11 @@ cd "$SCRIPT_DIR"
 CONFIG_FILE="${CONFIG_FILE:-obelisk.yml}"
 
 mkdir -p .obelisk/nginx
+rm -f .obelisk/nginx/*.conf
 
 yq e '.modules // {} | keys | .[]' "$CONFIG_FILE" | while read -r name; do
-    domain=$(yq e ".modules.${name}.domain" "$CONFIG_FILE")
-    port=$(yq e ".modules.${name}.port" "$CONFIG_FILE")
+    domain=$(yq e ".modules[\"${name}\"].domain" "$CONFIG_FILE")
+    port=$(yq e ".modules[\"${name}\"].port" "$CONFIG_FILE")
     cat > ".obelisk/nginx/${name}.conf" << NGINX
 server {
     listen 80;
@@ -273,6 +276,6 @@ set -e
 #   go run .
 #   python -m flask run --port 3000
 #   docker compose up
-echo "[Obelisk] No dev command configured. Edit .obelisk/dev.sh to start this module."
-exit 1
+echo "[Obelisk] No dev command configured. Edit .obelisk/dev.sh to start this module." >&2
+exit 0
 `

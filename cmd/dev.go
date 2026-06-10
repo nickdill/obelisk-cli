@@ -17,6 +17,7 @@ var devCmd = &cobra.Command{
 func runDev(cmd *cobra.Command, args []string) error {
 	script := ".obelisk/dev.sh"
 	if _, err := os.Stat(script); os.IsNotExist(err) {
+		// run.sh fallback for projects initialized before dev.sh was added
 		script = ".obelisk/run.sh"
 		if _, err := os.Stat(script); os.IsNotExist(err) {
 			return fmt.Errorf("no .obelisk/dev.sh found — run 'obelisk init' (server) or 'obelisk init --module' (module) first")
