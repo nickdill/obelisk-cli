@@ -74,13 +74,15 @@ The `obk1_` prefix versions the format (key type + encoding) so it can evolve.
 
 ### Fingerprint
 
-SSH-style: `SHA256:<base64(sha256(raw public key))>`. Used everywhere a key is displayed or referenced (revocation, audit logs). Short, copy-pasteable, unambiguous.
+`SHA256:<base64url-nopad(sha256(raw public key))>` — like SSH fingerprints, but using the URL-safe base64 alphabet without padding so a fingerprint can appear verbatim in a URL path segment (`DELETE /v1/keys/{fingerprint}`). Used everywhere a key is displayed or referenced (revocation, audit logs). Short, copy-pasteable, unambiguous.
 
 ---
 
 ## 3. Wire protocol (contract between obelisk-cli and obelisk-agent)
 
 This section is the normative spec. Both repos implement exactly this; protocol changes bump the `v1` version string.
+
+Golden vectors for the canonical signing string live at `obelisk-agent/internal/auth/testdata/vectors.json` (regenerated only on deliberate protocol changes via `gen_vectors.go` alongside it). Both repos' test suites must pass against that file — it is the executable form of this spec.
 
 ### Transport
 
@@ -109,22 +111,26 @@ v1
 {hex(sha256(request body))}
 ```
 
-- `METHOD` uppercase (`GET`, `POST`, ...). `PATH` is the request path including the `/_obelisk` prefix as sent, no query string ambiguity — query params are not used; parameters go in the body or path.
+- `METHOD` uppercase (`GET`, `POST`, ...). `PATH` is the **agent-side path** (`/v1/...`), i.e. what the agent sees after nginx strips the `/_obelisk` prefix — never the external proxy path. This keeps signatures proxy-agnostic (the same signature is valid against `https://host/_obelisk/v1/ping` and a direct `http://localhost:9100/v1/ping` in dev). The path is signed in **escaped** form (Go: `r.URL.EscapedPath()`); the CLI signs the path exactly as it puts it on the wire. No query string ambiguity — query params are not used; parameters go in the body or path.
 - Empty body still hashes (`sha256("")`), so GETs are covered.
 - Signing the body hash means the payload can't be swapped under a valid signature.
 
 ### Agent verification (in order, fail fast)
 
 1. **Timestamp window:** reject if `|now - timestamp| > 60s` → `401 {"error": "stale_timestamp"}`. Tolerates reasonable clock skew, kills old captures.
-2. **Replay check:** reject if `(key, nonce)` was seen within the last 120s (in-memory cache, ≥2× the timestamp window so a replayed request is always caught by one check or the other) → `401 {"error": "replay"}`.
-3. **Key lookup:** reject if the key is not in `allowed_keys.json` → `403 {"error": "unknown_key"}`.
-4. **Signature:** verify ED25519 signature over the recomputed canonical string → `401 {"error": "bad_signature"}` on failure.
+2. **Key lookup:** reject if the key is not in `allowed_keys.json` → `403 {"error": "unknown_key"}`.
+3. **Signature:** verify ED25519 signature over the recomputed canonical string → `401 {"error": "bad_signature"}` on failure. Request bodies are capped at 1 MiB → `413 {"error": "body_too_large"}`.
+4. **Replay check:** reject if `(key, nonce)` was seen within the last 120s (in-memory cache, ≥2× the timestamp window so a replayed request is always caught by the timestamp or nonce check) → `401 {"error": "replay"}`.
+
+The nonce is **committed** to the replay cache only after the signature verifies — so a request that fails any earlier check does not burn its nonce (the CLI may retry the identical signed request after a transport failure), and unauthenticated traffic cannot grow the cache.
 
 All error responses are JSON: `{"error": "<code>", "message": "<human readable>"}`.
 
 ### Responses
 
 JSON bodies, conventional status codes. The agent includes `X-Obelisk-Agent-Version` on every response so the CLI can warn on protocol drift.
+
+**Deploy streaming:** `POST /v1/deploy` responds `text/plain`, streaming the script's combined stdout+stderr live. The **last line** of the stream is always a JSON result object on its own line — `{"exit_code":N}` — regardless of whether the script's output ended with a newline. The CLI parses the final line for the result and treats everything before it as log output.
 
 ---
 
