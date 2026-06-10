@@ -19,7 +19,7 @@ func runDev(cmd *cobra.Command, args []string) error {
 	if _, err := os.Stat(script); os.IsNotExist(err) {
 		script = ".obelisk/run.sh"
 		if _, err := os.Stat(script); os.IsNotExist(err) {
-			return fmt.Errorf("no .obelisk/dev.sh found — run 'obelisk init' first")
+			return fmt.Errorf("no .obelisk/dev.sh found — run 'obelisk init' (server) or 'obelisk init --module' (module) first")
 		}
 	}
 
