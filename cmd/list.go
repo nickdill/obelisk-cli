@@ -55,6 +55,15 @@ var listCmd = &cobra.Command{
 				errs = append(errs, fmt.Sprintf("%s: %v", servers[i].Name, r.err))
 				continue
 			}
+			if len(r.modules) == 0 {
+				rows = append(rows, moduleStatus{
+					Server: servers[i].Name,
+					Name:   "(no modules)",
+					State:  "-",
+					Health: "-",
+				})
+				continue
+			}
 			rows = append(rows, r.modules...)
 		}
 
