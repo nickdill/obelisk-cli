@@ -23,8 +23,6 @@ obelisk dev        # run locally
 obelisk deploy     # deploy to your server
 ```
 
-Full documentation coming soon.
-
 That's it. Nginx configs, Docker Compose, and Let's Encrypt are all handled for you.
 
 ---
@@ -83,8 +81,61 @@ For local development, create an `obelisk.local.yml` with the same format but us
 - **Local dev mode** — self-signed certs, local paths, certbot disabled — same workflow everywhere
 - **Bring your own source** — point at a Docker image (ECR, Docker Hub, any registry) or a git repo
 - **Static site support** — SPAs and static files served directly by nginx; no extra container in production
+- **Signed deploys** — every CLI request is signed with your local ED25519 key; no SSH, no shared secrets
+- **Team access control** — add and revoke teammates via `obelisk allow` / `obelisk revoke`
 - **Webserver-level observability** — nginx access logs cover every service in one place, no per-app instrumentation needed
 - **DDoS protection** — rate limiting and request filtering at the nginx layer, before traffic reaches your apps
+
+---
+
+## Deploying to a server
+
+Obelisk servers expose a signed HTTPS API (via `obelisk-agent`) — no SSH required after initial setup.
+
+### First-time setup
+
+```bash
+# 1. Generate your identity key (run once per machine)
+obelisk identity
+#   Public key:  obk1_...
+#   Fingerprint: SHA256:...
+
+# 2. Paste the public key into your server's .env before provisioning:
+#   OBELISK_AUTHORIZED_KEY="obk1_... Your Name"
+
+# 3. After the server is running, register it locally
+obelisk server add prod https://obelisk.myteam.com
+
+# 4. Deploy
+obelisk deploy
+```
+
+### Adding a teammate
+
+```bash
+# Teammate runs on their machine:
+obelisk identity   # → copies their obk1_... key
+
+# You run:
+obelisk allow obk1_THEIRKEY --name "Alice" --server prod
+
+# Teammate registers the server and can deploy:
+obelisk server add prod https://obelisk.myteam.com
+obelisk deploy
+```
+
+### Server commands
+
+| Command | Description |
+|---|---|
+| `obelisk identity` | Show your public key and fingerprint |
+| `obelisk server add <name> <url>` | Register a server and verify connectivity |
+| `obelisk server list` | List registered servers |
+| `obelisk server remove <name>` | Unregister a server |
+| `obelisk allow <pubkey>` | Authorize a key on a server |
+| `obelisk revoke <fingerprint>` | Revoke a key from a server |
+| `obelisk list` | Show module status across all servers |
+| `obelisk deploy` | Deploy the current module |
 
 ---
 
@@ -101,20 +152,25 @@ No manual config files. No restarting nginx by hand. No keeping compose files in
 
 ## Roadmap
 
-### Now — v0.1
+### v0.1 — local development
 - [x] `obelisk.yml` config format
 - [x] Automatic nginx config generation
 - [x] Automatic Docker Compose generation
 - [x] Let's Encrypt SSL + Certbot
 - [x] Local dev mode (`obelisk.local.yml`)
 - [x] Static site module support
-- [x] AWS CodeDeploy integration
+
+### v0.2 — server connectivity
+- [x] ED25519 identity and signed requests (`obelisk identity`)
+- [x] Server registry (`obelisk server add/list/remove`)
+- [x] `obelisk deploy` — one-command deploy over signed HTTPS
+- [x] `obelisk list` — status across all registered servers
+- [x] Team key management (`obelisk allow` / `obelisk revoke`)
 
 ### Coming soon
-- [ ] `obelisk deploy` — one-command SSH deploy to any server
 - [ ] `obelisk publish` — build and push module images to a registry
-- [ ] `obelisk status` — health check and status summary for all running services
-- [ ] `obelisk logs [module]` — stream logs for a specific service
+- [ ] Key rotation and passphrase-encrypted private keys
+- [ ] Per-key permissions and scoping
 
 ### Future
 - [ ] Webserver-level analytics dashboard — traffic and error rates across all services
@@ -122,4 +178,3 @@ No manual config files. No restarting nginx by hand. No keeping compose files in
 - [ ] DNS management — automatic Route 53 record configuration
 - [ ] EC2 provisioning — spin up and configure servers from the CLI
 - [ ] CloudFront / S3 for static modules — CDN delivery without changing your config
-- [ ] Registry integration — `obelisk publish` push to ECR, Docker Hub, or any registry

@@ -296,13 +296,13 @@ The version var is in `cmd/root.go` as `var version = "dev"`.
 | `obelisk dev` / `down` / `logs` / `debug` | ✅ |
 | `internal/config` — yaml loading | ✅ |
 | `obelisk-agent` (separate repo) | ✅ built at `../obelisk-agent` |
-| `internal/identity` — keypair + signing | **next** |
-| `obelisk identity` command | **next** |
-| `internal/client` — signed HTTP | **next** |
-| `internal/registry` — server registry | **next** |
-| `obelisk server add/list/remove` | **next** |
-| `obelisk allow` / `obelisk revoke` | **next** |
-| `obelisk list` — fan-out status | **next** |
-| `obelisk deploy` — replace stub | **next** |
+| `internal/identity` — keypair + signing | ✅ |
+| `obelisk identity` command | ✅ |
+| `internal/client` — signed HTTP | ✅ |
+| `internal/registry` — server registry | ✅ |
+| `obelisk server add/list/remove` | ✅ |
+| `obelisk allow` / `obelisk revoke` | ✅ |
+| `obelisk list` — fan-out status | ✅ |
+| `obelisk deploy` — replace stub | ✅ |
 | `obelisk status` — replace stub | later |
 | `obelisk publish` — build + push images | later |

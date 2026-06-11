@@ -7,6 +7,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Server connectivity and auth** — the CLI can now communicate with deployed Obelisk servers over a signed HTTPS protocol. No SSH required after initial bootstrap.
+- `obelisk identity` — generate and display your local ED25519 keypair (`~/.config/obelisk/id_ed25519`). Prints `obk1_...` public key and `SHA256:...` fingerprint. Generates on first run; `--force` to rotate.
+- `obelisk server add <name> <url>` — register a server and verify connectivity with a signed handshake. Prints agent version on success; shows your public key with onboarding instructions on a 403.
+- `obelisk server list` — table of registered servers with name, URL, and last-seen time.
+- `obelisk server remove <name>` — remove a server from the local registry.
+- `obelisk allow <pubkey> [--name <label>] [--server <name>]` — authorize a teammate's public key on a server (`POST /v1/keys`).
+- `obelisk revoke <fingerprint> [--server <name>]` — revoke a key from a server (`DELETE /v1/keys/{fingerprint}`).
+- `obelisk list` — fan out `GET /v1/status` to all registered servers in parallel and render a combined module-state table.
+- `obelisk deploy` — fully implemented (replaces the previous stub). Reads the module name from `obelisk.yml`, resolves the target server, streams deploy output live, and exits with the agent's exit code. Flags: `--server <name>`.
+- `internal/identity` — ED25519 keypair management, `obk1_` encoding, `SHA256:` fingerprinting, and request signing. Wire format verified against the shared golden test vectors in `obelisk-agent`.
+- `internal/client` — signed HTTP client that attaches `X-Obelisk-Key`, `X-Obelisk-Timestamp`, `X-Obelisk-Nonce`, and `X-Obelisk-Signature` headers. Enforces HTTPS for non-localhost targets. Surfaces human-readable errors for unknown-key and clock-skew rejections.
+- `internal/registry` — local server registry at `~/.config/obelisk/servers.yml` with `Add`, `Remove`, `List`, and `Resolve` (auto-selects when only one server is registered).
 - `obelisk status` — shows project name, init state, and module list (ports + domains) for server projects; shows module name and port for module repos
 - `obelisk uninstall` — removes all Obelisk-managed files; detects project type and removes the appropriate set (server: `docker-compose.yml`, `obelisk.yml`, `.obelisk/`; module: `obelisk.yml`, `.obelisk/`)
 - `obelisk init` creates `.env` with `OBELISK_HTTP_PORT`/`OBELISK_HTTPS_PORT` overrides so multiple local projects can run on different ports simultaneously
