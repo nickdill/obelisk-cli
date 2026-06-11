@@ -47,4 +47,9 @@ func init() {
 	rootCmd.AddCommand(debugCmd)
 	rootCmd.AddCommand(updateCmd)
 	rootCmd.AddCommand(uninstallCmd)
+	rootCmd.AddCommand(identityCmd)
+	rootCmd.AddCommand(serverCmd)
+	rootCmd.AddCommand(allowCmd)
+	rootCmd.AddCommand(revokeCmd)
+	rootCmd.AddCommand(listCmd)
 }

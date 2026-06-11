@@ -5,19 +5,19 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/nickdill/obelisk/internal/config"
 	"github.com/spf13/cobra"
 )
 
-var uninstallPurge bool
-
 var uninstallCmd = &cobra.Command{
 	Use:   "uninstall",
-	Short: "Remove Obelisk-managed files from the current directory",
+	Short: "Remove all Obelisk-managed files from the current directory",
 	RunE:  runUninstall,
 }
 
-func init() {
-	uninstallCmd.Flags().BoolVar(&uninstallPurge, "purge", false, "Also remove obelisk.yml")
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 func runUninstall(cmd *cobra.Command, args []string) error {
@@ -26,41 +26,28 @@ func runUninstall(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	dirs := []string{".obelisk"}
-	files := []string{"docker-compose.yml", "docker-compose.override.yml"}
-
-	for _, d := range dirs {
-		full := filepath.Join(cwd, d)
-		if _, err := os.Stat(full); os.IsNotExist(err) {
-			continue
-		}
-		if err := os.RemoveAll(full); err != nil {
-			return fmt.Errorf("could not remove %s: %w", d, err)
-		}
-		fmt.Printf("  remove   %s/\n", d)
+	hasConfig := fileExists(filepath.Join(cwd, "obelisk.yml")) ||
+		fileExists(filepath.Join(cwd, "obelisk.local.yml"))
+	if !hasConfig {
+		return fmt.Errorf("no Obelisk project found in current directory")
 	}
 
-	for _, f := range files {
-		full := filepath.Join(cwd, f)
-		if _, err := os.Stat(full); os.IsNotExist(err) {
-			continue
-		}
-		if err := os.Remove(full); err != nil {
-			return fmt.Errorf("could not remove %s: %w", f, err)
-		}
-		fmt.Printf("  remove   %s\n", f)
-	}
-
-	if uninstallPurge {
-		full := filepath.Join(cwd, "obelisk.yml")
-		if _, err := os.Stat(full); err == nil {
-			if err := os.Remove(full); err != nil {
-				return fmt.Errorf("could not remove obelisk.yml: %w", err)
-			}
-			fmt.Println("  remove   obelisk.yml")
-		}
+	var targets []string
+	if config.IsModule() {
+		targets = []string{"obelisk.yml", ".obelisk"}
 	} else {
-		fmt.Println("  skip     obelisk.yml  (use --purge to also remove config)")
+		targets = []string{".obelisk", "docker-compose.yml", "docker-compose.override.yml", "obelisk.yml", "obelisk.local.yml"}
+	}
+
+	for _, target := range targets {
+		full := filepath.Join(cwd, target)
+		existed := fileExists(full)
+		if err := os.RemoveAll(full); err != nil {
+			return fmt.Errorf("could not remove %s: %w", target, err)
+		}
+		if existed {
+			fmt.Printf("  remove   %s\n", target)
+		}
 	}
 
 	fmt.Println("\nUninstalled. Run 'obelisk init' to reinitialize.")

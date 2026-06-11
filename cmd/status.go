@@ -26,6 +26,17 @@ type containerInfo struct {
 }
 
 func runStatus(cmd *cobra.Command, args []string) error {
+	_, initErr := os.Stat(".obelisk")
+	initialized := initErr == nil
+
+	if config.IsModule() {
+		modCfg, err := config.LoadModule()
+		if err != nil {
+			return err
+		}
+		return showModuleStatus(modCfg, initialized)
+	}
+
 	cfg, err := config.Load()
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -35,34 +46,18 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		}
 		return err
 	}
-
-	_, initErr := os.Stat(".obelisk")
-	initialized := initErr == nil || !os.IsNotExist(initErr)
-
-	if cfg.Type == "module" {
-		return showModuleStatus(cfg, initialized)
-	}
 	return showServerStatus(cfg, initialized)
 }
 
-func showModuleStatus(cfg *config.Config, initialized bool) error {
-	fmt.Printf("Project:  %s  (module)\n", cfg.Name)
+func showModuleStatus(cfg *config.ModuleConfig, initialized bool) error {
+	fmt.Printf("Module:  %s\n", cfg.Name)
 	if initialized {
-		fmt.Println("Init:     ✓ initialized")
+		fmt.Println("Init:    ✓ initialized")
 	} else {
-		fmt.Println("Init:     ✗ not initialized — run obelisk init --module")
+		fmt.Println("Init:    ✗ not initialized — run obelisk init --module")
 	}
-	fmt.Println()
-
-	for _, name := range sortedModuleKeys(cfg.Modules) {
-		m := cfg.Modules[name]
-		fmt.Printf("%s\n", name)
-		if m.Port != 0 {
-			fmt.Printf("  port:    %d\n", m.Port)
-		}
-		if m.Domain != "" {
-			fmt.Printf("  domain:  %s\n", m.Domain)
-		}
+	if cfg.Port != 0 {
+		fmt.Printf("Port:    %d\n", cfg.Port)
 	}
 	return nil
 }

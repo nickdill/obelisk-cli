@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
+	"github.com/nickdill/obelisk/internal/config"
 	"github.com/spf13/cobra"
 )
 
@@ -24,9 +26,54 @@ func runDev(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	if err := checkGenerateComposeStale(); err != nil {
+		return err
+	}
+
 	c := exec.Command("sh", script)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	c.Stdin = os.Stdin
 	return c.Run()
+}
+
+// checkGenerateComposeStale warns when any module uses git_source but the
+// installed generate-compose.sh predates git_source support.
+func checkGenerateComposeStale() error {
+	if config.IsModule() {
+		return nil // module projects don't use generate-compose.sh
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		return nil // no server config present — nothing to validate
+	}
+
+	needsGitSource := false
+	for _, m := range cfg.Modules {
+		if m.GitSource != "" {
+			needsGitSource = true
+			break
+		}
+	}
+	if !needsGitSource {
+		return nil
+	}
+
+	data, err := os.ReadFile(".obelisk/scripts/generate-compose.sh")
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	if !strings.Contains(string(data), "git_source") {
+		return fmt.Errorf(
+			"one or more modules use git_source but .obelisk/scripts/generate-compose.sh\n" +
+				"is from an older version that does not support it.\n" +
+				"Run: obelisk init --force",
+		)
+	}
+	return nil
 }

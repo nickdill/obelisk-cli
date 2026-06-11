@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -12,9 +13,10 @@ var initModuleMode bool
 var initForce bool
 
 var initCmd = &cobra.Command{
-	Use:   "init",
-	Short: "Initialize current directory as an Obelisk project",
-	RunE:  runInit,
+	Use:     "init",
+	Aliases: []string{"install", "i"},
+	Short:   "Initialize current directory as an Obelisk project",
+	RunE:    runInit,
 }
 
 func init() {
@@ -38,7 +40,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	if initModuleMode {
 		files = map[string]string{
-			"obelisk.yml":                    obeliskModuleYMLTemplate,
+			"obelisk.yml":                       obeliskModuleYMLTemplate,
 			filepath.Join(".obelisk", "dev.sh"): moduleDevSHTemplate,
 		}
 		doneMsg = "Module initialized. Edit obelisk.yml and .obelisk/dev.sh to configure your module."
@@ -50,6 +52,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		files = map[string]string{
 			"obelisk.yml":        obeliskYMLTemplate,
 			"docker-compose.yml": dockerComposeYMLTemplate,
+			".env":               dotEnvTemplate,
 			filepath.Join(".obelisk", "setup.sh"):                       setupSHTemplate,
 			filepath.Join(".obelisk", "run.sh"):                         runSHTemplate,
 			filepath.Join(".obelisk", "dev.sh"):                         devSHTemplate,
@@ -64,8 +67,8 @@ func runInit(cmd *cobra.Command, args []string) error {
 		_, statErr := os.Stat(full)
 		alreadyExists := statErr == nil
 
-		// always preserve obelisk.yml; preserve other files unless --force
-		shouldSkip := alreadyExists && (path == "obelisk.yml" || !initForce)
+		// always preserve obelisk.yml / .env; preserve other files unless --force
+		shouldSkip := alreadyExists && (path == "obelisk.yml" || path == ".env" || !initForce)
 		if shouldSkip {
 			fmt.Printf("  skip   %s\n", path)
 			continue
@@ -80,6 +83,34 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Ensure .env is listed in .gitignore (server projects only)
+	if !initModuleMode {
+		gitignorePath := filepath.Join(cwd, ".gitignore")
+		if data, err := os.ReadFile(gitignorePath); err == nil {
+			alreadyIgnored := false
+			for _, line := range strings.Split(strings.TrimRight(string(data), "\n"), "\n") {
+				if strings.TrimSpace(line) == ".env" {
+					alreadyIgnored = true
+					break
+				}
+			}
+			if !alreadyIgnored {
+				updated := append(data, []byte("\n.env\n")...)
+				if err := os.WriteFile(gitignorePath, updated, 0644); err != nil {
+					fmt.Fprintf(os.Stderr, "warning: could not update .gitignore: %v\n", err)
+				} else {
+					fmt.Println("  update .gitignore")
+				}
+			}
+		} else if os.IsNotExist(err) {
+			if err := os.WriteFile(gitignorePath, []byte(".env\n"), 0644); err != nil {
+				fmt.Fprintf(os.Stderr, "warning: could not create .gitignore: %v\n", err)
+			} else {
+				fmt.Println("  create .gitignore")
+			}
+		}
+	}
+
 	if initForce && !initModuleMode {
 		doneMsg = "Scripts updated to latest version. obelisk.yml was not changed."
 	}
@@ -91,8 +122,8 @@ const dockerComposeYMLTemplate = `services:
   nginx-webserver:
     image: nginx:latest
     ports:
-      - "80:80"
-      - "443:443"
+      - "${OBELISK_HTTP_PORT:-80}:80"
+      - "${OBELISK_HTTPS_PORT:-443}:443"
     volumes:
       - ./.obelisk/nginx:/etc/nginx/conf.d:ro
     networks:
@@ -104,14 +135,26 @@ networks:
     driver: bridge
 `
 
+const dotEnvTemplate = `# Local dev port overrides. Edit these if running multiple obelisk projects simultaneously.
+# These are gitignored and only apply to local development.
+# Production Obelisk servers use their own port configuration.
+OBELISK_HTTP_PORT=8080
+OBELISK_HTTPS_PORT=8443
+`
+
 const obeliskYMLTemplate = `version: "0.1"
 name: "my-obelisk"
-type: obelisk
+type: server
 modules:
-  # example:
+  # example with a prebuilt image:
   #   image: nginx:latest
   #   port: 80
   #   domain: example.com
+  #
+  # example with a local or git source (built by Docker Compose):
+  #   git_source: ../my-module
+  #   port: 3000
+  #   domain: my-module.example.com
 `
 
 const setupSHTemplate = `#!/bin/sh
@@ -212,8 +255,11 @@ YAML
 
 echo "$modules" | while read -r name; do
     image=$(yq e ".modules[\"${name}\"].image" "$CONFIG_FILE")
+    git_source=$(yq e ".modules[\"${name}\"].git_source" "$CONFIG_FILE")
     port=$(yq e ".modules[\"${name}\"].port" "$CONFIG_FILE")
-    cat >> docker-compose.override.yml << YAML
+
+    if [ "$image" != "null" ] && [ -n "$image" ]; then
+        cat >> docker-compose.override.yml << YAML
   ${name}:
     image: ${image}
     expose:
@@ -221,6 +267,19 @@ echo "$modules" | while read -r name; do
     networks:
       - obelisk
 YAML
+    elif [ "$git_source" != "null" ] && [ -n "$git_source" ]; then
+        cat >> docker-compose.override.yml << YAML
+  ${name}:
+    build:
+      context: ${git_source}
+    expose:
+      - "${port}"
+    networks:
+      - obelisk
+YAML
+    else
+        echo "[Obelisk] warning: module '${name}' has no image or git_source — skipping" >&2
+    fi
 done
 
 echo "[Obelisk] Generated docker-compose.override.yml"
@@ -261,11 +320,7 @@ echo "[Obelisk] Generated nginx configs."
 const obeliskModuleYMLTemplate = `version: "0.1"
 name: "my-module"
 type: module
-modules:
-  my-module:
-    image: my-module:latest
-    port: 3000
-    domain: my-module.localhost
+# port: 3000
 `
 
 const moduleDevSHTemplate = `#!/bin/sh

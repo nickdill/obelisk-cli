@@ -20,7 +20,16 @@ type Config struct {
 	Version string             `yaml:"version"`
 	Name    string             `yaml:"name"`
 	Type    string             `yaml:"type"`
+	Port    int                `yaml:"port"`
 	Modules map[string]*Module `yaml:"modules"`
+}
+
+func IsModule() bool {
+	cfg, err := Load()
+	if err != nil {
+		return false
+	}
+	return cfg.Type == "module"
 }
 
 func Path() string {
@@ -43,4 +52,22 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("could not parse %s: %w", path, err)
 	}
 	return &cfg, nil
+}
+
+type ModuleConfig struct {
+	Version string `yaml:"version"`
+	Name    string `yaml:"name"`
+	Port    int    `yaml:"port"`
+}
+
+func LoadModule() (*ModuleConfig, error) {
+	cfg, err := Load()
+	if err != nil {
+		return nil, err
+	}
+	return &ModuleConfig{
+		Version: cfg.Version,
+		Name:    cfg.Name,
+		Port:    cfg.Port,
+	}, nil
 }

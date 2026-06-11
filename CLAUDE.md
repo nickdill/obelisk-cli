@@ -57,10 +57,13 @@ internal/
 
 ## obelisk.yml schema
 
+Both server projects and module repos use `obelisk.yml`. The `type:` field distinguishes them.
+
+**Server project** (`type: server`):
 ```yaml
 version: "0.1"
 name: "my-project"
-type: obelisk
+type: server
 
 modules:
   api:
@@ -82,7 +85,15 @@ modules:
     type: static
 ```
 
-`obelisk.local.yml` overrides `obelisk.yml` when present (local dev paths, no SSL).
+**Module repo** (`type: module`):
+```yaml
+version: "0.1"
+name: "my-api"
+type: module
+port: 3000
+```
+
+`obelisk.local.yml` overrides `obelisk.yml` when present in server projects (local dev paths, no SSL).
 
 ---
 
