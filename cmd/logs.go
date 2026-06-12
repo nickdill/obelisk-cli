@@ -15,12 +15,11 @@ var logsCmd = &cobra.Command{
 }
 
 func runLogs(cmd *cobra.Command, args []string) error {
-	if _, err := os.Stat("docker-compose.yml"); os.IsNotExist(err) {
-		return fmt.Errorf("no docker-compose.yml found — run 'obelisk init' or 'obelisk new' first")
+	if len(args) == 0 {
+		return fmt.Errorf("specify a module name: obelisk logs <module>")
 	}
-
-	cmdArgs := append([]string{"compose", "logs", "-f"}, args...)
-	c := exec.Command("docker", cmdArgs...)
+	service := "obelisk_" + args[0]
+	c := exec.Command("docker", "service", "logs", "--follow", service)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	c.Stdin = os.Stdin

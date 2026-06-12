@@ -128,11 +128,15 @@ const dockerComposeYMLTemplate = `services:
       - ./.obelisk/nginx:/etc/nginx/conf.d:ro
     networks:
       - obelisk
-    restart: unless-stopped
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
 
 networks:
   obelisk:
-    driver: bridge
+    driver: overlay
+    attachable: true
 `
 
 const dotEnvTemplate = `# Local dev port overrides. Edit these if running multiple obelisk projects simultaneously.
@@ -146,12 +150,13 @@ const obeliskYMLTemplate = `version: "0.1"
 name: "my-obelisk"
 type: server
 modules:
-  # example with a prebuilt image:
-  #   image: nginx:latest
-  #   port: 80
-  #   domain: example.com
+  # example with a prebuilt image (production):
+  #   image: registry/myapp:latest
+  #   port: 3000
+  #   domain: myapp.example.com
+  #   replicas: 1   # optional, default 1; ignored in obelisk dev
   #
-  # example with a local or git source (built by Docker Compose):
+  # example with a local or git source (local dev only — not supported in obelisk deploy):
   #   git_source: ../my-module
   #   port: 3000
   #   domain: my-module.example.com
@@ -180,6 +185,14 @@ else
 fi
 export CONFIG_FILE
 
+# Initialize Docker Swarm (idempotent)
+if ! docker info --format '{{.Swarm.LocalNodeState}}' 2>/dev/null | grep -q 'active'; then
+    echo "[Obelisk] Initializing Docker Swarm..."
+    docker swarm init --advertise-addr 127.0.0.1
+else
+    echo "[Obelisk] Docker Swarm already active."
+fi
+
 echo "[Obelisk] Setup complete."
 `
 
@@ -195,17 +208,25 @@ else
     CONFIG_FILE=obelisk.yml
 fi
 export CONFIG_FILE
+export OBELISK_MODE=swarm
 
-echo "[Obelisk] Generating docker-compose override..."
+echo "[Obelisk] Generating stack override..."
 sh .obelisk/scripts/generate-compose.sh
 
 echo "[Obelisk] Generating nginx configs..."
 sh .obelisk/scripts/generate-nginx.sh
 
-echo "[Obelisk] Starting services..."
-docker compose up -d
+echo "[Obelisk] Deploying stack..."
+docker stack deploy --with-registry-auth \
+    -c docker-compose.yml \
+    -c docker-compose.override.yml \
+    obelisk
 
-docker exec nginx-webserver nginx -s reload 2>/dev/null || true
+echo "[Obelisk] Reloading nginx..."
+NGINX_CONTAINER=$(docker ps --filter "name=obelisk_nginx-webserver" --format "{{.ID}}" | head -1)
+if [ -n "$NGINX_CONTAINER" ]; then
+    docker exec "$NGINX_CONTAINER" nginx -s reload 2>/dev/null || true
+fi
 
 echo "[Obelisk] Running."
 `
@@ -257,9 +278,27 @@ echo "$modules" | while read -r name; do
     image=$(yq e ".modules[\"${name}\"].image" "$CONFIG_FILE")
     git_source=$(yq e ".modules[\"${name}\"].git_source" "$CONFIG_FILE")
     port=$(yq e ".modules[\"${name}\"].port" "$CONFIG_FILE")
+    replicas=$(yq e ".modules[\"${name}\"].replicas // 1" "$CONFIG_FILE")
 
     if [ "$image" != "null" ] && [ -n "$image" ]; then
-        cat >> docker-compose.override.yml << YAML
+        if [ "${OBELISK_MODE:-}" = "swarm" ]; then
+            cat >> docker-compose.override.yml << YAML
+  ${name}:
+    image: ${image}
+    expose:
+      - "${port}"
+    networks:
+      - obelisk
+    deploy:
+      replicas: ${replicas}
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+YAML
+        else
+            cat >> docker-compose.override.yml << YAML
   ${name}:
     image: ${image}
     expose:
@@ -267,8 +306,12 @@ echo "$modules" | while read -r name; do
     networks:
       - obelisk
 YAML
+        fi
     elif [ "$git_source" != "null" ] && [ -n "$git_source" ]; then
-        cat >> docker-compose.override.yml << YAML
+        if [ "${OBELISK_MODE:-}" = "swarm" ]; then
+            echo "[Obelisk] warning: module '${name}' uses git_source which is not supported in Swarm mode — skipping" >&2
+        else
+            cat >> docker-compose.override.yml << YAML
   ${name}:
     build:
       context: ${git_source}
@@ -277,6 +320,7 @@ YAML
     networks:
       - obelisk
 YAML
+        fi
     else
         echo "[Obelisk] warning: module '${name}' has no image or git_source — skipping" >&2
     fi

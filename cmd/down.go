@@ -14,7 +14,7 @@ var downCmd = &cobra.Command{
 }
 
 func runDown(cmd *cobra.Command, args []string) error {
-	c := exec.Command("docker", "compose", "down")
+	c := exec.Command("docker", "stack", "rm", "obelisk")
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	c.Stdin = os.Stdin

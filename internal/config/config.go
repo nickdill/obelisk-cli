@@ -14,6 +14,7 @@ type Module struct {
 	Domain    string            `yaml:"domain"`
 	Type      string            `yaml:"type"`
 	Env       map[string]string `yaml:"env"`
+	Replicas  int               `yaml:"replicas"`
 }
 
 type Config struct {
