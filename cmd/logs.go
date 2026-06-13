@@ -9,8 +9,8 @@ import (
 )
 
 var logsCmd = &cobra.Command{
-	Use:   "logs [service...]",
-	Short: "Tail logs for all services (or a specific one)",
+	Use:   "logs <module>",
+	Short: "Tail logs for a module",
 	RunE:  runLogs,
 }
 

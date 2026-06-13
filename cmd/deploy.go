@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -39,8 +40,19 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Deploying module %q to %s ...\n", cfg.Name, srv.Name)
 
+	deployBody := map[string]string{"module": cfg.Name}
+	if sha := gitSHA(); sha != "" {
+		deployBody["sha"] = sha
+	}
+	if branch := gitBranch(); branch != "" {
+		deployBody["branch"] = branch
+	}
+	if tag := gitTag(); tag != "" {
+		deployBody["tag"] = tag
+	}
+
 	c := client.New(srv.URL)
-	resp, err := c.Post("/v1/deploy", map[string]string{"module": cfg.Name})
+	resp, err := c.Post("/v1/deploy", deployBody)
 	if err != nil {
 		return err
 	}
@@ -105,4 +117,32 @@ func streamDeploy(r io.Reader) (int, error) {
 
 func init() {
 	deployCmd.Flags().StringVar(&deployServer, "server", "", "Target server name (required if multiple servers registered)")
+}
+
+func gitSHA() string {
+	out, err := exec.Command("git", "rev-parse", "HEAD").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func gitBranch() string {
+	out, err := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD").Output()
+	if err != nil {
+		return ""
+	}
+	branch := strings.TrimSpace(string(out))
+	if branch == "HEAD" {
+		return "" // detached HEAD
+	}
+	return branch
+}
+
+func gitTag() string {
+	out, err := exec.Command("git", "describe", "--tags", "--exact-match").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }

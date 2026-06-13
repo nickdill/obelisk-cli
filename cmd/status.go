@@ -167,7 +167,7 @@ func replicasToState(replicas string) string {
 		return "running"
 	}
 	if running == "0" {
-		return "stopped"
+		return "starting"
 	}
 	return "degraded"
 }

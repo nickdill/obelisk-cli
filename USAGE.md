@@ -3,12 +3,14 @@
 ## Local development
 
 ```bash
-obelisk new <name>        # scaffold a new project from the template
-obelisk init              # initialize obelisk.yml + .obelisk/ scripts in current dir
-obelisk init --module     # initialize as a module repo instead of a server project
+obelisk new <name>        # scaffold a new project from the template (downloads obelisk-template)
+obelisk init              # initialize current dir as a server project (downloads obelisk-template)
+obelisk init --force      # re-download and update scripts; preserves obelisk.yml and .env
+obelisk init --module     # initialize as a module repo (no network — writes two local files)
 obelisk dev               # start all services (runs .obelisk/dev.sh)
-obelisk down              # docker compose down
-obelisk logs [service]    # tail logs; optionally filter to a specific service
+obelisk dev --build       # build images via docker compose before starting
+obelisk down              # stop all services (docker stack rm)
+obelisk logs <module>     # tail logs for a specific module (docker service logs)
 obelisk status            # show project type, init state, and running container states
 obelisk debug             # print the active obelisk.yml / obelisk.local.yml to stdout
 obelisk uninstall         # remove all Obelisk-managed files from the current directory
@@ -80,15 +82,17 @@ Deploy output is streamed live. The command exits with the remote script's exit 
 ## Viewing status
 
 ```bash
-obelisk list    # fan out GET /v1/status to all registered servers
+obelisk list                        # fan out GET /v1/status to all registered servers
+obelisk scale <module> <replicas>   # set replica count for a module on a server
+obelisk scale <module> <replicas> --server staging
 ```
 
-Output:
+`obelisk list` output:
 ```
-SERVER    MODULE   STATE    HEALTH
-prod      api      running  healthy
-prod      web      running
-staging   api      exited
+SERVER    URL                            MODULE   STATE    HEALTH
+prod      https://obelisk.myteam.com     api      running  healthy
+prod      https://obelisk.myteam.com     web      running
+staging   https://staging.example.com    api      exited
 ```
 
 ---

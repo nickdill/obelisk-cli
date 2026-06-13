@@ -25,6 +25,12 @@ go build -o ~/.local/bin/obelisk .
 
 After that, `obelisk` in any terminal points to what you just built.
 
+Or use the convenience script, which does the same thing:
+
+```bash
+./local-install.sh
+```
+
 ## Iterating on changes
 
 When you make a change and want to test it:
@@ -37,9 +43,43 @@ That rebuilds and immediately makes the new version available. No need to uninst
 
 ## Removing the local install
 
+To remove just the binary:
+
 ```bash
 rm ~/.local/bin/obelisk
 ```
+
+To remove the binary and the server registry (`~/.config/obelisk/servers.yml`) while preserving your identity keys:
+
+```bash
+./uninstall.sh
+```
+
+To remove everything including identity keys (`--all` flag):
+
+```bash
+./uninstall.sh --all
+```
+
+## Working on the template
+
+Both `obelisk new` and `obelisk init` (server mode) pull a tarball from the `obelisk-template` GitHub repo. The branch or tag they fetch is controlled by a single constant in `cmd/template.go`:
+
+```go
+const templateRef = "main"
+```
+
+**To test against a different branch or tag** — change `templateRef` before building:
+
+```go
+const templateRef = "my-feature-branch"  // or "v0.2.0", etc.
+```
+
+Rebuild and your local binary will use that ref.
+
+**`obelisk init --force`** re-downloads the template from the current `templateRef` and overwrites all scripts, preserving only `obelisk.yml` and `.env`. This is how users upgrade their project scripts when the template improves.
+
+**Module mode is unaffected** — `obelisk init --module` writes two tiny hardcoded files (`obelisk.yml` and `.obelisk/dev.sh`) with no network call.
 
 ## Shipping a release
 
@@ -55,12 +95,12 @@ Releases are automated via GitHub Actions (`.github/workflows/release.yml`). Pus
    ```
 3. GitHub Actions builds `obelisk-darwin-amd64`, `obelisk-darwin-arm64`, `obelisk-linux-amd64`, `obelisk-linux-arm64` and attaches them to the release automatically.
 
-Check build progress at: `https://github.com/nickdill/obelisk/actions`
+Check build progress at: `https://github.com/nickdill/obelisk-cli/actions`
 
 Once the workflow completes, the `install.sh` script will work for anyone:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/nickdill/obelisk/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/nickdill/obelisk-cli/main/install.sh | bash
 ```
 
 ## Tagging conventions

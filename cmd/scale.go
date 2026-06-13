@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"strconv"
+	"strings"
 
 	"github.com/nickdill/obelisk/internal/client"
 	"github.com/spf13/cobra"
@@ -37,7 +39,8 @@ func runScale(cmd *cobra.Command, args []string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("scale failed (%d)", resp.StatusCode)
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("scale failed (%d): %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	fmt.Printf("Scaled %s to %d replica(s) on %s.\n", module, n, srv.Name)

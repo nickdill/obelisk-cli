@@ -13,6 +13,7 @@ import (
 
 type moduleStatus struct {
 	Server string
+	URL    string
 	Name   string
 	State  string
 	Health string
@@ -58,6 +59,7 @@ var listCmd = &cobra.Command{
 			if len(r.modules) == 0 {
 				rows = append(rows, moduleStatus{
 					Server: servers[i].Name,
+					URL:    servers[i].URL,
 					Name:   "(no modules)",
 					State:  "-",
 					Health: "-",
@@ -74,12 +76,12 @@ var listCmd = &cobra.Command{
 			return fmt.Errorf("could not reach any servers")
 		}
 
-		fmt.Printf("%-20s  %-20s  %-10s  %s\n", "SERVER", "MODULE", "STATE", "HEALTH")
-		fmt.Printf("%-20s  %-20s  %-10s  %s\n",
-			strings.Repeat("-", 20), strings.Repeat("-", 20),
-			strings.Repeat("-", 10), strings.Repeat("-", 10))
+		fmt.Printf("%-20s  %-30s  %-20s  %-10s  %s\n", "SERVER", "URL", "MODULE", "STATE", "HEALTH")
+		fmt.Printf("%-20s  %-30s  %-20s  %-10s  %s\n",
+			strings.Repeat("-", 20), strings.Repeat("-", 30),
+			strings.Repeat("-", 20), strings.Repeat("-", 10), strings.Repeat("-", 10))
 		for _, row := range rows {
-			fmt.Printf("%-20s  %-20s  %-10s  %s\n", row.Server, row.Name, row.State, row.Health)
+			fmt.Printf("%-20s  %-30s  %-20s  %-10s  %s\n", row.Server, row.URL, row.Name, row.State, row.Health)
 		}
 
 		for _, e := range errs {
@@ -112,6 +114,7 @@ func fetchStatus(srv registry.Server) ([]moduleStatus, error) {
 	for _, m := range body.Modules {
 		modules = append(modules, moduleStatus{
 			Server: srv.Name,
+			URL:    srv.URL,
 			Name:   m.Name,
 			State:  m.State,
 			Health: m.Health,

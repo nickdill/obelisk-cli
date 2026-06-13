@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-REPO="nickdill/obelisk"
+REPO="nickdill/obelisk-cli"
 BINARY="obelisk"
 INSTALL_DIR="$HOME/.local/bin"
 

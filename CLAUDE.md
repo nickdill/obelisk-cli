@@ -11,7 +11,7 @@ The `obelisk` CLI manages the full lifecycle of Obelisk projects and modules —
 ```
 obelisk-cli (this repo)        — developer CLI
 obelisk-agent (../obelisk-agent) — HTTP agent that runs on every deployed Obelisk server
-obelisk-template               — base Docker Compose project scaffolded by `obelisk new`
+obelisk-template               — base Docker Compose project scaffolded by `obelisk new` and `obelisk init`
 ```
 
 The CLI communicates with deployed servers exclusively through `obelisk-agent` over signed HTTPS. No SSH required after initial bootstrap.
@@ -34,23 +34,30 @@ The CLI communicates with deployed servers exclusively through `obelisk-agent` o
 main.go                    calls cmd.Execute()
 cmd/
   root.go                  banner, version, command registration
-  new.go          ✅       downloads obelisk-template tarball, scaffolds project dir
-  init.go         ✅       creates obelisk.yml + .obelisk/ scripts in current dir
-  dev.go          ✅       runs .obelisk/dev.sh (or run.sh fallback)
-  down.go         ✅       docker compose down
-  logs.go         ✅       docker compose logs -f [service...]
+  template.go     ✅       shared template download logic; templateRef const controls branch/tag
+  new.go          ✅       downloads obelisk-template tarball, scaffolds new project dir
+  init.go         ✅       server mode: downloads obelisk-template into cwd; module mode: writes two hardcoded files
+  dev.go          ✅       runs .obelisk/dev.sh (or run.sh fallback); --build flag pre-builds images
+  down.go         ✅       docker stack rm obelisk (Swarm)
+  logs.go         ✅       docker service logs <module> (Swarm; requires exactly one module name)
   debug.go        ✅       prints active obelisk.yml / obelisk.local.yml
   update.go       ✅       re-runs installer script
-  deploy.go       STUB     prints "coming soon" — needs full implementation
-  status.go       STUB     prints "coming soon" — needs full implementation
+  uninstall.go    ✅       removes obelisk-managed files from cwd (type-aware)
+  identity.go     ✅       keypair display + generation
+  allow.go        ✅       POST /v1/keys — authorize a teammate's public key
+  revoke.go       ✅       DELETE /v1/keys/{fingerprint}
+  server.go       ✅       server add / list / remove subcommands
+  deploy.go       ✅       POST /v1/deploy; streams output; sends git sha/branch/tag metadata
+  status.go       ✅       local project status + docker stack services (Swarm replicas)
+  scale.go        ✅       POST /v1/scale — set replica count for a module
   publish.go      STUB     prints "coming soon" — needs full implementation
 
 internal/
   config/
     config.go     ✅       loads obelisk.yml / obelisk.local.yml; Config and Module structs
-  identity/       TODO     ED25519 keypair gen/load/sign, obk1_ encoding, fingerprinting
-  client/         TODO     signed HTTP client for talking to obelisk-agent
-  registry/       TODO     local server registry (~/.config/obelisk/servers.yml)
+  identity/       ✅       ED25519 keypair gen/load/sign, obk1_ encoding, fingerprinting
+  client/         ✅       signed HTTP client for talking to obelisk-agent
+  registry/       ✅       local server registry (~/.config/obelisk/servers.yml)
 ```
 
 ---
@@ -140,7 +147,7 @@ v1
 
 ---
 
-## Internal packages to build
+## Internal packages
 
 ### `internal/identity`
 
@@ -192,7 +199,7 @@ Resolve(name string) (Server, error)   // "" → first server if only one regist
 
 ---
 
-## Commands to build
+## Commands
 
 ### `obelisk identity`
 
@@ -235,21 +242,23 @@ Remove from local `servers.yml`.
 Fan out `GET /v1/status` to every registered server. Render a combined table:
 
 ```
-SERVER    MODULE   STATE    HEALTH
-prod      api      running  healthy
-prod      web      running
-staging   api      exited
+SERVER    URL                       MODULE   STATE    HEALTH
+prod      https://obelisk.myteam.com  api      running  healthy
+prod      https://obelisk.myteam.com  web      running
+staging   https://staging.example.com  api      exited
 ```
 
 ### `obelisk deploy [--server <name>]`
 
-Replace the current stub in `cmd/deploy.go`:
-
 1. Load `obelisk.yml` via `internal/config` to get the current module name
-2. Resolve target server from `internal/registry` (prompt if ambiguous)
-3. `POST /v1/deploy` with `{"module": "<name>"}` via `internal/client`
+2. Resolve target server from `internal/registry` (auto-selects when only one registered)
+3. `POST /v1/deploy` with `{"module": "<name>", "sha": "...", "branch": "...", "tag": "..."}` — git metadata fields are omitted when not available (e.g., detached HEAD, no tag)
 4. Stream the response body (script output) to stdout
 5. Parse the trailing `{"exit_code": N}` line; exit non-zero on failure
+
+### `obelisk scale <module> <replicas> [--server <name>]`
+
+`POST /v1/scale` with `{"module": "<name>", "replicas": N}`. Adjusts the Docker Swarm replica count for the named service.
 
 ---
 
@@ -304,5 +313,6 @@ The version var is in `cmd/root.go` as `var version = "dev"`.
 | `obelisk allow` / `obelisk revoke` | ✅ |
 | `obelisk list` — fan-out status | ✅ |
 | `obelisk deploy` — replace stub | ✅ |
-| `obelisk status` — replace stub | later |
+| `obelisk status` — local + Swarm status | ✅ |
+| `obelisk scale` — set replica count | ✅ |
 | `obelisk publish` — build + push images | later |

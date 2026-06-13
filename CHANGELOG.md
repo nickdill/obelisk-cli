@@ -7,6 +7,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Docker Swarm runtime** — Obelisk servers now run on Docker Swarm mode instead of plain Docker Compose. `obelisk down` runs `docker stack rm obelisk`; `obelisk logs` uses `docker service logs`; `obelisk status` queries `docker stack services` and shows a REPLICAS column.
+- `obelisk scale <module> <replicas> [--server <name>]` — set the Swarm replica count for a module via `POST /v1/scale`.
+- `obelisk dev --build` — build images via `docker compose build` before starting the dev server.
+- `obelisk list` now shows a URL column so you can distinguish servers at a glance.
+- `obelisk deploy` now attaches git metadata to the deploy request (`sha`, `branch`, `tag`) when available; fields are omitted silently on detached HEAD or untagged commits.
+- `local-install.sh` — convenience script that builds and installs a dev binary to `~/.local/bin/obelisk` in one step.
+- `uninstall.sh` — removes the binary and server registry; `--all` flag also removes identity keys.
+
 - **Server connectivity and auth** — the CLI can now communicate with deployed Obelisk servers over a signed HTTPS protocol. No SSH required after initial bootstrap.
 - `obelisk identity` — generate and display your local ED25519 keypair (`~/.config/obelisk/id_ed25519`). Prints `obk1_...` public key and `SHA256:...` fingerprint. Generates on first run; `--force` to rotate.
 - `obelisk server add <name> <url>` — register a server and verify connectivity with a signed handshake. Prints agent version on success; shows your public key with onboarding instructions on a 403.
@@ -30,6 +38,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- `obelisk init` (server mode) now downloads the project scaffold from `github.com/nickdill/obelisk-template` instead of writing hardcoded files baked into the binary. `obelisk new` and `obelisk init` now share the same template source — `templateRef` in `cmd/template.go` controls which branch or tag is fetched. `--force` re-downloads and updates scripts rather than restoring compiled-in defaults.
 - Config file naming unified: both server projects and module repos now use `obelisk.yml`, distinguished by a `type:` field (`type: server` vs `type: module`). Previously module repos used `obelisk.module.yml`.
 - `docker-compose.yml` template uses `${OBELISK_HTTP_PORT:-80}` / `${OBELISK_HTTPS_PORT:-443}` instead of hardcoded ports
 - `obelisk status` module view uses `ModuleConfig` and renders `Module: <name>` / `Port: <n>` instead of the server-style module table
@@ -37,4 +46,5 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `install.sh` referenced the wrong GitHub repo (`nickdill/obelisk`); corrected to `nickdill/obelisk-cli`.
 - `obelisk dev` no longer errors with a config-not-found message when run in a project without `obelisk.yml`; the staleness check is skipped when no config is present

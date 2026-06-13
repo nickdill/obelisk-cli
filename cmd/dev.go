@@ -10,10 +10,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var devBuild bool
+
 var devCmd = &cobra.Command{
 	Use:   "dev",
 	Short: "Start all services in development mode",
 	RunE:  runDev,
+}
+
+func init() {
+	devCmd.Flags().BoolVar(&devBuild, "build", false, "Build images before starting")
 }
 
 func runDev(cmd *cobra.Command, args []string) error {
@@ -28,6 +34,15 @@ func runDev(cmd *cobra.Command, args []string) error {
 
 	if err := checkGenerateComposeStale(); err != nil {
 		return err
+	}
+
+	if devBuild {
+		build := exec.Command("docker", "compose", "build")
+		build.Stdout = os.Stdout
+		build.Stderr = os.Stderr
+		if err := build.Run(); err != nil {
+			return fmt.Errorf("docker compose build failed: %w", err)
+		}
 	}
 
 	c := exec.Command("sh", script)

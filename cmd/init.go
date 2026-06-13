@@ -35,52 +35,38 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("could not create .obelisk/: %w", err)
 	}
 
-	var files map[string]string
 	var doneMsg string
 
 	if initModuleMode {
-		files = map[string]string{
+		files := map[string]string{
 			"obelisk.yml":                       obeliskModuleYMLTemplate,
 			filepath.Join(".obelisk", "dev.sh"): moduleDevSHTemplate,
 		}
+		for path, content := range files {
+			full := filepath.Join(cwd, path)
+			_, statErr := os.Stat(full)
+			alreadyExists := statErr == nil
+
+			if alreadyExists && (path == "obelisk.yml" || !initForce) {
+				fmt.Printf("  skip   %s\n", path)
+				continue
+			}
+			if err := os.WriteFile(full, []byte(content), 0755); err != nil {
+				return fmt.Errorf("could not write %s: %w", path, err)
+			}
+			if alreadyExists {
+				fmt.Printf("  update %s\n", path)
+			} else {
+				fmt.Printf("  create %s\n", path)
+			}
+		}
 		doneMsg = "Module initialized. Edit obelisk.yml and .obelisk/dev.sh to configure your module."
 	} else {
-		scriptsDir := filepath.Join(cwd, ".obelisk", "scripts")
-		if err := os.MkdirAll(scriptsDir, 0755); err != nil {
-			return fmt.Errorf("could not create .obelisk/scripts/: %w", err)
-		}
-		files = map[string]string{
-			"obelisk.yml":        obeliskYMLTemplate,
-			"docker-compose.yml": dockerComposeYMLTemplate,
-			".env":               dotEnvTemplate,
-			filepath.Join(".obelisk", "setup.sh"):                       setupSHTemplate,
-			filepath.Join(".obelisk", "run.sh"):                         runSHTemplate,
-			filepath.Join(".obelisk", "dev.sh"):                         devSHTemplate,
-			filepath.Join(".obelisk", "scripts", "generate-compose.sh"): generateComposeSHTemplate,
-			filepath.Join(".obelisk", "scripts", "generate-nginx.sh"):   generateNginxSHTemplate,
+		fmt.Println("Downloading template from github.com/nickdill/obelisk-template...")
+		if err := applyTemplate(cwd, []string{"obelisk.yml", ".env"}, initForce); err != nil {
+			return err
 		}
 		doneMsg = "Project initialized. Edit obelisk.yml to configure your modules."
-	}
-
-	for path, content := range files {
-		full := filepath.Join(cwd, path)
-		_, statErr := os.Stat(full)
-		alreadyExists := statErr == nil
-
-		// always preserve obelisk.yml / .env; preserve other files unless --force
-		shouldSkip := alreadyExists && (path == "obelisk.yml" || path == ".env" || !initForce)
-		if shouldSkip {
-			fmt.Printf("  skip   %s\n", path)
-			continue
-		}
-		if err := os.WriteFile(full, []byte(content), 0755); err != nil {
-			return fmt.Errorf("could not write %s: %w", path, err)
-		}
-		if alreadyExists {
-			fmt.Printf("  update %s\n", path)
-		} else {
-			fmt.Printf("  create %s\n", path)
-		}
 	}
 
 	// Ensure .env is listed in .gitignore (server projects only)
@@ -117,249 +103,6 @@ func runInit(cmd *cobra.Command, args []string) error {
 	fmt.Println("\n" + doneMsg)
 	return nil
 }
-
-const dockerComposeYMLTemplate = `services:
-  nginx-webserver:
-    image: nginx:latest
-    ports:
-      - "${OBELISK_HTTP_PORT:-80}:80"
-      - "${OBELISK_HTTPS_PORT:-443}:443"
-    volumes:
-      - ./.obelisk/nginx:/etc/nginx/conf.d:ro
-    networks:
-      - obelisk
-    deploy:
-      replicas: 1
-      restart_policy:
-        condition: on-failure
-
-networks:
-  obelisk:
-    driver: overlay
-    attachable: true
-`
-
-const dotEnvTemplate = `# Local dev port overrides. Edit these if running multiple obelisk projects simultaneously.
-# These are gitignored and only apply to local development.
-# Production Obelisk servers use their own port configuration.
-OBELISK_HTTP_PORT=8080
-OBELISK_HTTPS_PORT=8443
-`
-
-const obeliskYMLTemplate = `version: "0.1"
-name: "my-obelisk"
-type: server
-modules:
-  # example with a prebuilt image (production):
-  #   image: registry/myapp:latest
-  #   port: 3000
-  #   domain: myapp.example.com
-  #   replicas: 1   # optional, default 1; ignored in obelisk dev
-  #
-  # example with a local or git source (local dev only — not supported in obelisk deploy):
-  #   git_source: ../my-module
-  #   port: 3000
-  #   domain: my-module.example.com
-`
-
-const setupSHTemplate = `#!/bin/sh
-set -e
-
-SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$SCRIPT_DIR"
-
-# Install yq if not present
-if ! command -v yq > /dev/null 2>&1; then
-    echo "[Obelisk] Installing yq..."
-    wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
-    chmod +x /usr/local/bin/yq
-fi
-
-# Load environment
-[ -f .env ] && . ./.env
-
-if [ -f obelisk.local.yml ]; then
-    CONFIG_FILE=obelisk.local.yml
-else
-    CONFIG_FILE=obelisk.yml
-fi
-export CONFIG_FILE
-
-# Initialize Docker Swarm (idempotent)
-if ! docker info --format '{{.Swarm.LocalNodeState}}' 2>/dev/null | grep -q 'active'; then
-    echo "[Obelisk] Initializing Docker Swarm..."
-    docker swarm init --advertise-addr 127.0.0.1
-else
-    echo "[Obelisk] Docker Swarm already active."
-fi
-
-echo "[Obelisk] Setup complete."
-`
-
-const runSHTemplate = `#!/bin/sh
-set -e
-
-SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$SCRIPT_DIR"
-
-if [ -f obelisk.local.yml ]; then
-    CONFIG_FILE=obelisk.local.yml
-else
-    CONFIG_FILE=obelisk.yml
-fi
-export CONFIG_FILE
-export OBELISK_MODE=swarm
-
-echo "[Obelisk] Generating stack override..."
-sh .obelisk/scripts/generate-compose.sh
-
-echo "[Obelisk] Generating nginx configs..."
-sh .obelisk/scripts/generate-nginx.sh
-
-echo "[Obelisk] Deploying stack..."
-docker stack deploy --with-registry-auth \
-    -c docker-compose.yml \
-    -c docker-compose.override.yml \
-    obelisk
-
-echo "[Obelisk] Reloading nginx..."
-NGINX_CONTAINER=$(docker ps --filter "name=obelisk_nginx-webserver" --format "{{.ID}}" | head -1)
-if [ -n "$NGINX_CONTAINER" ]; then
-    docker exec "$NGINX_CONTAINER" nginx -s reload 2>/dev/null || true
-fi
-
-echo "[Obelisk] Running."
-`
-
-const devSHTemplate = `#!/bin/sh
-set -e
-
-SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$SCRIPT_DIR"
-
-if [ -f obelisk.local.yml ]; then
-    CONFIG_FILE=obelisk.local.yml
-else
-    CONFIG_FILE=obelisk.yml
-fi
-export CONFIG_FILE
-
-echo "[Obelisk] Generating docker-compose override..."
-sh .obelisk/scripts/generate-compose.sh
-
-echo "[Obelisk] Generating nginx configs..."
-sh .obelisk/scripts/generate-nginx.sh
-
-echo "[Obelisk] Starting services (dev mode)..."
-docker compose up
-`
-
-const generateComposeSHTemplate = `#!/bin/sh
-set -e
-
-SCRIPT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
-cd "$SCRIPT_DIR"
-
-CONFIG_FILE="${CONFIG_FILE:-obelisk.yml}"
-
-modules=$(yq e '.modules // {} | keys | .[]' "$CONFIG_FILE")
-
-if [ -z "$modules" ]; then
-    printf 'services: {}\n' > docker-compose.override.yml
-    echo "[Obelisk] Generated docker-compose.override.yml"
-    exit 0
-fi
-
-cat > docker-compose.override.yml << 'YAML'
-services:
-YAML
-
-echo "$modules" | while read -r name; do
-    image=$(yq e ".modules[\"${name}\"].image" "$CONFIG_FILE")
-    git_source=$(yq e ".modules[\"${name}\"].git_source" "$CONFIG_FILE")
-    port=$(yq e ".modules[\"${name}\"].port" "$CONFIG_FILE")
-    replicas=$(yq e ".modules[\"${name}\"].replicas // 1" "$CONFIG_FILE")
-
-    if [ "$image" != "null" ] && [ -n "$image" ]; then
-        if [ "${OBELISK_MODE:-}" = "swarm" ]; then
-            cat >> docker-compose.override.yml << YAML
-  ${name}:
-    image: ${image}
-    expose:
-      - "${port}"
-    networks:
-      - obelisk
-    deploy:
-      replicas: ${replicas}
-      update_config:
-        parallelism: 1
-        delay: 10s
-      restart_policy:
-        condition: on-failure
-YAML
-        else
-            cat >> docker-compose.override.yml << YAML
-  ${name}:
-    image: ${image}
-    expose:
-      - "${port}"
-    networks:
-      - obelisk
-YAML
-        fi
-    elif [ "$git_source" != "null" ] && [ -n "$git_source" ]; then
-        if [ "${OBELISK_MODE:-}" = "swarm" ]; then
-            echo "[Obelisk] warning: module '${name}' uses git_source which is not supported in Swarm mode — skipping" >&2
-        else
-            cat >> docker-compose.override.yml << YAML
-  ${name}:
-    build:
-      context: ${git_source}
-    expose:
-      - "${port}"
-    networks:
-      - obelisk
-YAML
-        fi
-    else
-        echo "[Obelisk] warning: module '${name}' has no image or git_source — skipping" >&2
-    fi
-done
-
-echo "[Obelisk] Generated docker-compose.override.yml"
-`
-
-const generateNginxSHTemplate = `#!/bin/sh
-set -e
-
-SCRIPT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
-cd "$SCRIPT_DIR"
-
-CONFIG_FILE="${CONFIG_FILE:-obelisk.yml}"
-
-mkdir -p .obelisk/nginx
-rm -f .obelisk/nginx/*.conf
-
-yq e '.modules // {} | keys | .[]' "$CONFIG_FILE" | while read -r name; do
-    domain=$(yq e ".modules[\"${name}\"].domain" "$CONFIG_FILE")
-    port=$(yq e ".modules[\"${name}\"].port" "$CONFIG_FILE")
-    cat > ".obelisk/nginx/${name}.conf" << NGINX
-server {
-    listen 80;
-    server_name ${domain};
-
-    location / {
-        proxy_pass http://${name}:${port};
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    }
-}
-NGINX
-done
-
-echo "[Obelisk] Generated nginx configs."
-`
 
 const obeliskModuleYMLTemplate = `version: "0.1"
 name: "my-module"
