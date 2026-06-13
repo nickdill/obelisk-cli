@@ -39,8 +39,9 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	if initModuleMode {
 		files := map[string]string{
-			"obelisk.yml":                       obeliskModuleYMLTemplate,
-			filepath.Join(".obelisk", "dev.sh"): moduleDevSHTemplate,
+			"obelisk.yml":                         obeliskModuleYMLTemplate,
+			filepath.Join(".obelisk", "dev.sh"):   moduleDevSHTemplate,
+			filepath.Join(".obelisk", "build.sh"): moduleBuildSHTemplate,
 		}
 		for path, content := range files {
 			full := filepath.Join(cwd, path)
@@ -108,6 +109,17 @@ const obeliskModuleYMLTemplate = `version: "0.1"
 name: "my-module"
 type: module
 # port: 3000
+`
+
+const moduleBuildSHTemplate = `#!/bin/sh
+set -e
+# Build this module for production.
+# Replace the command below with your project's build command, for example:
+#   npm run build
+#   cargo build --release
+#   go build -o bin/app .
+echo "[Obelisk] No build command configured. Edit .obelisk/build.sh." >&2
+exit 0
 `
 
 const moduleDevSHTemplate = `#!/bin/sh
