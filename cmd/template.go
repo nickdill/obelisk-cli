@@ -81,7 +81,7 @@ func applyTemplate(destDir string, skipPaths []string, force bool) error {
 			_, statErr := os.Stat(full)
 			alreadyExists := statErr == nil
 
-			if skipSet[rel] || (alreadyExists && !force) {
+			if alreadyExists && (skipSet[rel] || !force) {
 				fmt.Printf("  skip   %s\n", rel)
 				continue
 			}
