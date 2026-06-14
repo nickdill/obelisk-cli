@@ -14,8 +14,7 @@ const banner = `
       /  \      / _ \ | __ ) | ____|| |    |_ _| / ___|| |/ /
      /    \    | | | ||  _ \ |  _|  | |     | |  \___ \| ' /
     /      \   | |_| || |_) || |___ | |___  | |   ___) || . \
-   /________\   \___/ |____/ |_____||_____||___| |____/ |_|\_\
-   Deploy multiple projects to one server`
+   /________\   \___/ |____/ |_____||_____||___| |____/ |_|\_\`
 
 var rootCmd = &cobra.Command{
 	Use:     "obelisk",
@@ -24,7 +23,6 @@ var rootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(banner)
 		fmt.Println()
-		cmd.Help()
 	},
 }
 
@@ -36,6 +34,7 @@ func Execute() {
 }
 
 func init() {
+	rootCmd.SetVersionTemplate("Obelisk CLI version {{.Version}}\n")
 	rootCmd.AddCommand(newCmd)
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(devCmd)

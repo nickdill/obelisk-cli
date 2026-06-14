@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,7 +18,8 @@ import (
 var updateHTTPClient = &http.Client{
 	Timeout: 30 * time.Second,
 	Transport: &http.Transport{
-		ForceAttemptHTTP2: false,
+		// Empty map disables HTTP/2 — ForceAttemptHTTP2: false alone does not.
+		TLSNextProto: make(map[string]func(string, *tls.Conn) http.RoundTripper),
 	},
 }
 
