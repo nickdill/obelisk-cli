@@ -23,6 +23,18 @@ var rootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(banner)
 		fmt.Println()
+		fmt.Println("Common commands:")
+		rows := [][4]string{
+			{"init", "create a server project", "init -m", "create a module"},
+			{"dev", "run local dev", "dev --build", "build & run local"},
+			{"run", "start production", "stop", "stop services"},
+			{"deploy", "deploy a module", "list", "status all servers"},
+			{"server add", "add a server", "identity", "show your key"},
+		}
+		for _, r := range rows {
+			fmt.Printf("  \033[1m%-16s\033[0m%-29s\033[1m%-15s\033[0m%s\n", r[0], r[1], r[2], r[3])
+		}
+		fmt.Println()
 	},
 }
 

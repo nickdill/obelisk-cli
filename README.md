@@ -16,10 +16,14 @@ Obelisk is a deployment framework for indie developers and small teams who want 
 
 ## Getting started
 
+The only usage dependencies are Docker and yq to run the server and read configs.
+
 ```bash
 # Install
 curl -fsSL https://raw.githubusercontent.com/nickdill/obelisk-cli/main/install.sh | bash
+```
 
+```bash
 # Create a new project
 obelisk new my-project
 cd my-project
