@@ -9,9 +9,9 @@ The `obelisk` CLI manages the full lifecycle of Obelisk projects and modules —
 ## Ecosystem
 
 ```
-obelisk-cli (this repo)        — developer CLI
+obelisk-cli (this repo)          — developer CLI
 obelisk-agent (../obelisk-agent) — HTTP agent that runs on every deployed Obelisk server
-obelisk-template               — base Docker Compose project scaffolded by `obelisk new` and `obelisk init`
+obelisk                          — base Docker Compose project scaffolded by `obelisk init`
 ```
 
 The CLI communicates with deployed servers exclusively through `obelisk-agent` over signed HTTPS. No SSH required after initial bootstrap.

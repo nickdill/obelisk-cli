@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,13 +14,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var updateHTTPClient = &http.Client{
-	Timeout: 30 * time.Second,
-	Transport: &http.Transport{
-		// Empty map disables HTTP/2 — ForceAttemptHTTP2: false alone does not.
-		TLSNextProto: make(map[string]func(string, *tls.Conn) http.RoundTripper),
-	},
-}
+var updateHTTPClient = &http.Client{Timeout: 60 * time.Second}
 
 const githubRepo = "nickdill/obelisk-cli"
 

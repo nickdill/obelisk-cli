@@ -3,5 +3,9 @@ obelisk-darwin-*
 obelisk-linux-*
 *.env
 .env
+CLAUDE.md
 .claude/
+_plans/
+_docs/
+_work/
 docker-compose.override.yml
