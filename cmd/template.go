@@ -15,7 +15,7 @@ const templateRef = "main"
 const maxTemplateBytes = 50 << 20 // 50 MB
 
 func templateTarballURL() string {
-	return "https://codeload.github.com/nickdill/obelisk-template/tar.gz/refs/heads/" + templateRef
+	return "https://codeload.github.com/nickdill/obelisk/tar.gz/refs/heads/" + templateRef
 }
 
 // applyTemplate downloads the template tarball and writes files into destDir.
