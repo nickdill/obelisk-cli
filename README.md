@@ -45,7 +45,7 @@ Obelisk generates all of it from one config file. Add a service, run one command
 # obelisk.yml
 version: "0.1"
 name: my-project
-type: obelisk
+type: server
 
 modules:
   api:
@@ -166,6 +166,9 @@ No manual config files. No restarting nginx by hand. No keeping compose files in
 - [x] `obelisk deploy` — one-command deploy over signed HTTPS
 - [x] `obelisk list` — status across all registered servers
 - [x] Team key management (`obelisk allow` / `obelisk revoke`)
+- [x] `obelisk scale` — set Swarm replica count for a module
+- [x] `obelisk update [version]` — self-updating binary from GitHub Releases
+- [x] `obelisk build` / `run` / `stop` — module build and production service lifecycle
 
 ### Coming soon
 - [ ] `obelisk publish` — build and push module images to a registry
@@ -174,7 +177,6 @@ No manual config files. No restarting nginx by hand. No keeping compose files in
 
 ### Future
 - [ ] Webserver-level analytics dashboard — traffic and error rates across all services
-- [ ] `obelisk scale` — horizontal scaling across multiple servers
 - [ ] DNS management — automatic Route 53 record configuration
 - [ ] EC2 provisioning — spin up and configure servers from the CLI
 - [ ] CloudFront / S3 for static modules — CDN delivery without changing your config

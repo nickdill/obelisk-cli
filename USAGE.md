@@ -9,7 +9,10 @@ obelisk init --force      # re-download and update scripts; preserves obelisk.ym
 obelisk init --module     # initialize as a module repo (no network — writes two local files)
 obelisk dev               # start all services (runs .obelisk/dev.sh)
 obelisk dev --build       # build images via docker compose before starting
-obelisk down              # stop all services (docker stack rm)
+obelisk build             # compile the current module (.obelisk/build.sh)
+obelisk run               # start services in production mode (.obelisk/run.sh — Docker Swarm)
+obelisk stop              # stop all running services (.obelisk/stop.sh)
+obelisk down              # tear down the Docker Swarm stack (docker stack rm)
 obelisk logs <module>     # tail logs for a specific module (docker service logs)
 obelisk status            # show project type, init state, and running container states
 obelisk debug             # print the active obelisk.yml / obelisk.local.yml to stdout
@@ -94,6 +97,17 @@ prod      https://obelisk.myteam.com     api      running  healthy
 prod      https://obelisk.myteam.com     web      running
 staging   https://staging.example.com    api      exited
 ```
+
+---
+
+## Updating the CLI
+
+```bash
+obelisk update            # update to the latest release
+obelisk update 1.2.3      # update (or downgrade) to a specific version
+```
+
+Downloads the correct binary for your OS and architecture from GitHub Releases and atomically replaces the running binary. If you are already on the target version, the command exits early.
 
 ---
 

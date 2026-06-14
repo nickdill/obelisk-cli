@@ -38,10 +38,13 @@ cmd/
   new.go          ✅       downloads obelisk-template tarball, scaffolds new project dir
   init.go         ✅       server mode: downloads obelisk-template into cwd; module mode: writes two hardcoded files
   dev.go          ✅       runs .obelisk/dev.sh (or run.sh fallback); --build flag pre-builds images
+  build.go        ✅       runs .obelisk/build.sh (module compilation)
+  run.go          ✅       runs .obelisk/run.sh (production Docker Swarm start)
+  stop.go         ✅       runs .obelisk/stop.sh (stops all services)
   down.go         ✅       docker stack rm obelisk (Swarm)
   logs.go         ✅       docker service logs <module> (Swarm; requires exactly one module name)
   debug.go        ✅       prints active obelisk.yml / obelisk.local.yml
-  update.go       ✅       re-runs installer script
+  update.go       ✅       self-updater; downloads correct binary from GitHub Releases; accepts optional version arg
   uninstall.go    ✅       removes obelisk-managed files from cwd (type-aware)
   identity.go     ✅       keypair display + generation
   allow.go        ✅       POST /v1/keys — authorize a teammate's public key
@@ -303,6 +306,8 @@ The version var is in `cmd/root.go` as `var version = "dev"`.
 | `obelisk new` — scaffold from template | ✅ |
 | `obelisk init` — create obelisk.yml + scripts | ✅ |
 | `obelisk dev` / `down` / `logs` / `debug` | ✅ |
+| `obelisk build` / `run` / `stop` — module build + production lifecycle | ✅ |
+| `obelisk update [version]` — self-updater from GitHub Releases | ✅ |
 | `internal/config` — yaml loading | ✅ |
 | `obelisk-agent` (separate repo) | ✅ built at `../obelisk-agent` |
 | `internal/identity` — keypair + signing | ✅ |

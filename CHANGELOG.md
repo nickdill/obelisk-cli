@@ -7,6 +7,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `obelisk update [version]` — self-updater that downloads and atomically replaces the current binary from GitHub Releases. `obelisk update` fetches the latest release; `obelisk update 1.2.3` (or `v1.2.3`) pins to a specific version. Skips the download if already on the target version. The `--source-dir` flag (which previously just printed a curl command) has been removed.
+- `obelisk build` — runs `.obelisk/build.sh` to compile the current module (e.g. build a Docker image or compile a binary). Errors with a helpful message if the script is missing.
+- `obelisk run` — starts all services in production mode via `.obelisk/run.sh` (Docker Swarm). Equivalent to what the server does on deploy.
+- `obelisk stop` — stops all running services via `.obelisk/stop.sh`.
+
 - **Docker Swarm runtime** — Obelisk servers now run on Docker Swarm mode instead of plain Docker Compose. `obelisk down` runs `docker stack rm obelisk`; `obelisk logs` uses `docker service logs`; `obelisk status` queries `docker stack services` and shows a REPLICAS column.
 - `obelisk scale <module> <replicas> [--server <name>]` — set the Swarm replica count for a module via `POST /v1/scale`.
 - `obelisk dev --build` — build images via `docker compose build` before starting the dev server.
