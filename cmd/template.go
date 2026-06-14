@@ -15,7 +15,7 @@ import (
 const templateRef = "main"
 const maxTemplateBytes = 50 << 20 // 50 MB
 
-var templateHTTPClient = &http.Client{Timeout: 60 * time.Second}
+var templateHTTPClient = newHTTPClient(60 * time.Second)
 
 func templateTarballURL() string {
 	return "https://codeload.github.com/nickdill/obelisk/tar.gz/refs/heads/" + templateRef

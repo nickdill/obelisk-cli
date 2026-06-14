@@ -2,17 +2,17 @@ package client
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
-
-	"crypto/rand"
 
 	"github.com/nickdill/obelisk/internal/identity"
 )
@@ -28,7 +28,15 @@ type Client struct {
 func New(baseURL string) *Client {
 	return &Client{
 		BaseURL: strings.TrimRight(baseURL, "/"),
-		http:    &http.Client{Timeout: 30 * time.Minute},
+		http: &http.Client{
+			Timeout: 30 * time.Minute,
+			Transport: &http.Transport{
+				DialContext: (&net.Dialer{
+					Timeout:   10 * time.Second,
+					KeepAlive: 30 * time.Second,
+				}).DialContext,
+			},
+		},
 	}
 }
 

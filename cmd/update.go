@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var updateHTTPClient = &http.Client{Timeout: 60 * time.Second}
+var updateHTTPClient = newHTTPClient(60 * time.Second)
 
 const githubRepo = "nickdill/obelisk-cli"
 
