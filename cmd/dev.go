@@ -45,6 +45,10 @@ func runDev(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	if err := checkYQ(); err != nil {
+		return err
+	}
+
 	if devBuild {
 		build := exec.Command("docker", "compose", "build")
 		build.Stdout = os.Stdout
