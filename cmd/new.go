@@ -24,7 +24,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 	}
 	projectDir := filepath.Join(base, name)
 
-	fmt.Println("Downloading template from github.com/nickdill/obelisk-template...")
+	fmt.Println("Downloading template from github.com/nickdill/obelisk...")
 
 	if err := applyTemplate(projectDir, nil, false); err != nil {
 		return fmt.Errorf("could not extract template: %w", err)

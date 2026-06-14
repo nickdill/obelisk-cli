@@ -63,7 +63,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 		doneMsg = "Module initialized. Edit obelisk.yml and .obelisk/dev.sh to configure your module."
 	} else {
-		fmt.Println("Downloading template from github.com/nickdill/obelisk-template...")
+		fmt.Println("Downloading template from github.com/nickdill/obelisk...")
 		if err := applyTemplate(cwd, []string{"obelisk.yml", ".env"}, initForce); err != nil {
 			return err
 		}

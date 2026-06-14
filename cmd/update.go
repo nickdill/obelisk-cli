@@ -9,9 +9,17 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 )
+
+var updateHTTPClient = &http.Client{
+	Timeout: 30 * time.Second,
+	Transport: &http.Transport{
+		ForceAttemptHTTP2: false,
+	},
+}
 
 const githubRepo = "nickdill/obelisk-cli"
 
@@ -73,7 +81,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 		os.Remove(tmpPath)
 	}()
 
-	resp, err := http.Get(url) //nolint:gosec
+	resp, err := updateHTTPClient.Get(url) //nolint:gosec
 	if err != nil {
 		return fmt.Errorf("download failed: %w", err)
 	}
@@ -102,7 +110,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 
 func fetchLatestVersion() (string, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", githubRepo)
-	resp, err := http.Get(url) //nolint:gosec
+	resp, err := updateHTTPClient.Get(url) //nolint:gosec
 	if err != nil {
 		return "", fmt.Errorf("could not reach GitHub: %w", err)
 	}
@@ -129,7 +137,7 @@ func fetchLatestVersion() (string, error) {
 
 func validateRelease(version string) error {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/tags/%s", githubRepo, version)
-	resp, err := http.Get(url) //nolint:gosec
+	resp, err := updateHTTPClient.Get(url) //nolint:gosec
 	if err != nil {
 		return fmt.Errorf("could not reach GitHub: %w", err)
 	}

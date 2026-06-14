@@ -12,7 +12,7 @@ Obelisk is a deployment framework for indie developers and small teams who want 
 
 ```bash
 # Install
-curl -fsSL https://obelisk.dev/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/nickdill/obelisk-cli/main/install.sh | bash
 
 # Create a new project
 obelisk new my-project
