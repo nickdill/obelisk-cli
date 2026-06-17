@@ -43,7 +43,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 func checkYQ() error {
 	if _, err := exec.LookPath("yq"); err != nil {
-		return fmt.Errorf("yq is required but not installed\n\nInstall it with:\n  brew install yq           # macOS / Linuxbrew\n  snap install yq           # Ubuntu/Debian\n  pip install yq            # Python (any platform)\n  https://github.com/mikefarah/yq/releases  # manual download")
+		return fmt.Errorf("yq is required but not installed\n\nInstall it with:\n  # Linux / EC2:\n  sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq\n  sudo chmod +x /usr/bin/yq\n\n  # macOS:\n  brew install yq")
 	}
 	return nil
 }

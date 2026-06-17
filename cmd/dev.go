@@ -16,6 +16,7 @@ const swarmComposeNetwork = "obelisk"                                    // netw
 const swarmNetworkName = swarmStackName + "_" + swarmComposeNetwork // Docker prefixes it with the stack name on deploy
 
 var devBuild bool
+var devProfile string
 
 var devCmd = &cobra.Command{
 	Use:   "dev",
@@ -25,6 +26,7 @@ var devCmd = &cobra.Command{
 
 func init() {
 	devCmd.Flags().BoolVar(&devBuild, "build", false, "Build images before starting")
+	devCmd.Flags().StringVarP(&devProfile, "profile", "p", "local", "Compose profile to activate")
 }
 
 func runDev(cmd *cobra.Command, args []string) error {
@@ -50,7 +52,7 @@ func runDev(cmd *cobra.Command, args []string) error {
 	}
 
 	if devBuild {
-		build := exec.Command("docker", "compose", "build")
+		build := exec.Command("docker", "compose", "--profile", devProfile, "build")
 		build.Stdout = os.Stdout
 		build.Stderr = os.Stderr
 		if err := build.Run(); err != nil {
@@ -59,6 +61,7 @@ func runDev(cmd *cobra.Command, args []string) error {
 	}
 
 	c := exec.Command("sh", script)
+	c.Env = append(os.Environ(), "OBELISK_PROFILE="+devProfile)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	c.Stdin = os.Stdin

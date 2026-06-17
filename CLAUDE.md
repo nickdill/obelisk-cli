@@ -34,12 +34,13 @@ The CLI communicates with deployed servers exclusively through `obelisk-agent` o
 main.go                    calls cmd.Execute()
 cmd/
   root.go                  banner, version, command registration
+  httpclient.go            shared HTTP client constructor (timeout + dial config)
   template.go     ✅       shared template download logic; templateRef const controls branch/tag
   new.go          ✅       downloads obelisk-template tarball, scaffolds new project dir
   init.go         ✅       server mode: downloads obelisk-template into cwd; module mode: writes two hardcoded files
   dev.go          ✅       runs .obelisk/dev.sh (or run.sh fallback); --build flag pre-builds images
   build.go        ✅       runs .obelisk/build.sh (module compilation)
-  run.go          ✅       runs .obelisk/run.sh (production Docker Swarm start)
+  run.go          ✅       ensures Swarm manager (auto-inits if inactive), checks yq dep, then runs .obelisk/run.sh
   stop.go         ✅       runs .obelisk/stop.sh (stops all services)
   down.go         ✅       docker stack rm obelisk (Swarm)
   logs.go         ✅       docker service logs <module> (Swarm; requires exactly one module name)
@@ -53,6 +54,7 @@ cmd/
   deploy.go       ✅       POST /v1/deploy; streams output; sends git sha/branch/tag metadata
   status.go       ✅       local project status + docker stack services (Swarm replicas)
   scale.go        ✅       POST /v1/scale — set replica count for a module
+  list.go         ✅       GET /v1/status fan-out across all registered servers; combined table output
   publish.go      STUB     prints "coming soon" — needs full implementation
 
 internal/
@@ -107,7 +109,7 @@ port: 3000
 
 ---
 
-## Auth model (what needs to be built)
+## Auth model
 
 The CLI and `obelisk-agent` use an ED25519 signed-request protocol — no sessions, no central login. Full spec is in `CLI_AUTHENTICATION_PLAN.md`.
 
