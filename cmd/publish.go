@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
@@ -50,7 +51,12 @@ func runPublish(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no 'image' field in obelisk.yml — set it to your registry path, e.g. ghcr.io/<user>/%s", cfg.Name)
 	}
 
+	base, existingTag := splitImageRef(cfg.Image)
+
 	tag := publishTag
+	if tag == "" {
+		tag = existingTag
+	}
 	if tag == "" {
 		tag = shortSHA()
 	}
@@ -58,7 +64,7 @@ func runPublish(cmd *cobra.Command, args []string) error {
 		tag = "latest"
 	}
 
-	fullRef := cfg.Image + ":" + tag
+	fullRef := base + ":" + tag
 	fmt.Printf("Publishing %s\n\n", fullRef)
 
 	// Build
@@ -70,17 +76,18 @@ func runPublish(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("docker build failed: %w", err)
 	}
 
-	// Login
+	// Login — load registry credentials from the project .env
 	if !publishSkipAuth {
+		envVars := loadLocalEnv("REGISTRY_HOST", "REGISTRY_USER", "REGISTRY_TOKEN")
 		registryHost := publishRegistry
 		if registryHost == "" {
-			registryHost = os.Getenv("REGISTRY_HOST")
+			registryHost = envVars["REGISTRY_HOST"]
 		}
 		if registryHost != "" {
-			user := os.Getenv("REGISTRY_USER")
-			token := os.Getenv("REGISTRY_TOKEN")
+			user := envVars["REGISTRY_USER"]
+			token := envVars["REGISTRY_TOKEN"]
 			if user == "" || token == "" {
-				return fmt.Errorf("REGISTRY_USER and REGISTRY_TOKEN must be set (or use --skip-login)")
+				return fmt.Errorf("REGISTRY_USER and REGISTRY_TOKEN must be set in the project .env (or use --skip-login)")
 			}
 			fmt.Printf("\n==> Logging in to %s...\n", registryHost)
 			loginCmd := exec.Command("docker", "login", registryHost, "--username", user, "--password-stdin")
@@ -104,6 +111,52 @@ func runPublish(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("\nPublished: %s\n", fullRef)
 	return nil
+}
+
+// loadLocalEnv reads the .env file in the current directory and returns
+// only the requested keys. Falls back to os.Getenv for each missing key.
+func loadLocalEnv(keys ...string) map[string]string {
+	result := make(map[string]string, len(keys))
+	want := make(map[string]bool, len(keys))
+	for _, k := range keys {
+		want[k] = true
+	}
+
+	if f, err := os.Open(".env"); err == nil {
+		defer f.Close()
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			k, v, ok := strings.Cut(line, "=")
+			if !ok {
+				continue
+			}
+			k = strings.TrimSpace(k)
+			if want[k] {
+				v = strings.TrimSpace(v)
+				v = strings.Trim(v, "\"'")
+				result[k] = v
+			}
+		}
+	}
+
+	for _, k := range keys {
+		if result[k] == "" {
+			result[k] = os.Getenv(k)
+		}
+	}
+	return result
+}
+
+func splitImageRef(ref string) (base, tag string) {
+	i := strings.LastIndex(ref, ":")
+	if i > 0 && !strings.Contains(ref[i+1:], "/") {
+		return ref[:i], ref[i+1:]
+	}
+	return ref, ""
 }
 
 func shortSHA() string {
