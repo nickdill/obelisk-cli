@@ -108,6 +108,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 const obeliskModuleYMLTemplate = `version: "0.1"
 name: "my-module"
 type: module
+# image: ghcr.io/<user>/<repo>
 # port: 3000
 `
 

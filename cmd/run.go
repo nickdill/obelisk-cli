@@ -11,9 +11,10 @@ import (
 )
 
 var runCmd = &cobra.Command{
-	Use:   "run",
-	Short: "Start all services in production mode (Docker Swarm)",
-	RunE:  runRun,
+	Use:          "run",
+	Short:        "Start all services in production mode (Docker Swarm)",
+	SilenceUsage: true,
+	RunE:         runRun,
 }
 
 func runRun(cmd *cobra.Command, args []string) error {

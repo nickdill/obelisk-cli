@@ -17,6 +17,7 @@ import (
 )
 
 var deployServer string
+var deployImage string
 
 var deployCmd = &cobra.Command{
 	Use:   "deploy",
@@ -41,6 +42,9 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Deploying module %q to %s ...\n", cfg.Name, srv.Name)
 
 	deployBody := map[string]string{"module": cfg.Name}
+	if deployImage != "" {
+		deployBody["image"] = deployImage
+	}
 	if sha := gitSHA(); sha != "" {
 		deployBody["sha"] = sha
 	}
@@ -117,6 +121,7 @@ func streamDeploy(r io.Reader) (int, error) {
 
 func init() {
 	deployCmd.Flags().StringVar(&deployServer, "server", "", "Target server name (required if multiple servers registered)")
+	deployCmd.Flags().StringVar(&deployImage, "image", "", "Exact image ref to deploy (e.g. ghcr.io/user/mod:abc123)")
 }
 
 func gitSHA() string {

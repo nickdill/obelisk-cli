@@ -21,6 +21,7 @@ type Config struct {
 	Version string             `yaml:"version"`
 	Name    string             `yaml:"name"`
 	Type    string             `yaml:"type"`
+	Image   string             `yaml:"image"`
 	Port    int                `yaml:"port"`
 	Modules map[string]*Module `yaml:"modules"`
 }
