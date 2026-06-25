@@ -55,7 +55,7 @@ cmd/
   status.go       ✅       local project status + docker stack services (Swarm replicas)
   scale.go        ✅       POST /v1/scale — set replica count for a module
   list.go         ✅       GET /v1/status fan-out across all registered servers; combined table output
-  publish.go      STUB     prints "coming soon" — needs full implementation
+  publish.go      ✅       builds + pushes module images via docker buildx; supports multi-arch
 
 internal/
   config/
@@ -82,6 +82,7 @@ modules:
     image: 123456789.dkr.ecr.us-east-2.amazonaws.com/my-api:latest
     port: 3000
     domain: api.example.com
+    platform: linux/arm64
     env:
       DATABASE_URL: postgres://...
 
@@ -102,8 +103,12 @@ modules:
 version: "0.1"
 name: "my-api"
 type: module
+image: ghcr.io/user/my-api
 port: 3000
+platform: linux/amd64,linux/arm64
 ```
+
+The `platform` field sets the target architecture for `obelisk publish`. Accepts a single platform (`linux/arm64`) or comma-separated list (`linux/amd64,linux/arm64`) for multi-arch manifest builds. Defaults to `linux/amd64` when omitted. The `--platform` CLI flag overrides the config value.
 
 `obelisk.local.yml` overrides `obelisk.yml` when present in server projects (local dev paths, no SSL).
 
@@ -265,6 +270,20 @@ staging   https://staging.example.com  api      exited
 
 `POST /v1/scale` with `{"module": "<name>", "replicas": N}`. Adjusts the Docker Swarm replica count for the named service.
 
+### `obelisk publish`
+
+Build and push a module's Docker image to a container registry using `docker buildx`.
+
+1. Load `obelisk.yml` — must be `type: module` with an `image:` field
+2. Resolve tag: `--tag` flag > existing tag in image ref > git SHA > `latest`
+3. Resolve platform: `--platform` flag > `platform` in config > `linux/amd64`
+4. Login to registry (credentials from `.env` or env vars: `REGISTRY_HOST`, `REGISTRY_USER`, `REGISTRY_TOKEN`)
+5. Run `docker buildx build --platform <platform> -t <image:tag> --push .`
+
+Flags: `--tag`, `--platform`, `--registry`, `--skip-login`
+
+Multi-arch: set `platform: linux/amd64,linux/arm64` in `obelisk.yml` (or pass via `--platform`) to build a manifest list. Docker automatically pulls the correct architecture on the target server.
+
 ---
 
 ## Team onboarding flow
@@ -322,4 +341,4 @@ The version var is in `cmd/root.go` as `var version = "dev"`.
 | `obelisk deploy` — replace stub | ✅ |
 | `obelisk status` — local + Swarm status | ✅ |
 | `obelisk scale` — set replica count | ✅ |
-| `obelisk publish` — build + push images | later |
+| `obelisk publish` — build + push images (multi-arch via buildx) | ✅ |

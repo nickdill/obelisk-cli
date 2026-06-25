@@ -16,6 +16,7 @@ var (
 	publishTag      string
 	publishRegistry string
 	publishSkipAuth bool
+	publishPlatform string
 )
 
 var publishCmd = &cobra.Command{
@@ -37,6 +38,7 @@ func init() {
 	publishCmd.Flags().StringVar(&publishTag, "tag", "", "Image tag (default: git SHA or 'latest')")
 	publishCmd.Flags().StringVar(&publishRegistry, "registry", "", "Registry host to login to (overrides REGISTRY_HOST env)")
 	publishCmd.Flags().BoolVar(&publishSkipAuth, "skip-login", false, "Skip docker login (use when auth is handled externally)")
+	publishCmd.Flags().StringVar(&publishPlatform, "platform", "", "Target platform for the image build (default: linux/amd64)")
 }
 
 func runPublish(cmd *cobra.Command, args []string) error {
@@ -49,6 +51,17 @@ func runPublish(cmd *cobra.Command, args []string) error {
 	}
 	if cfg.Image == "" {
 		return fmt.Errorf("no 'image' field in obelisk.yml — set it to your registry path, e.g. ghcr.io/<user>/%s", cfg.Name)
+	}
+
+	platform := publishPlatform
+	if platform == "" {
+		platform = cfg.Platform
+	}
+	if platform == "" {
+		platform = "linux/amd64"
+	}
+	if err := validatePlatform(platform); err != nil {
+		return err
 	}
 
 	base, existingTag := splitImageRef(cfg.Image)
@@ -67,15 +80,6 @@ func runPublish(cmd *cobra.Command, args []string) error {
 	fullRef := base + ":" + tag
 	fmt.Printf("Publishing %s\n\n", fullRef)
 
-	// Build
-	fmt.Println("==> Building image...")
-	buildCmd := exec.Command("docker", "build", "-t", fullRef, ".")
-	buildCmd.Stdout = os.Stdout
-	buildCmd.Stderr = os.Stderr
-	if err := buildCmd.Run(); err != nil {
-		return fmt.Errorf("docker build failed: %w", err)
-	}
-
 	// Login — load registry credentials from the project .env
 	if !publishSkipAuth {
 		envVars := loadLocalEnv("REGISTRY_HOST", "REGISTRY_USER", "REGISTRY_TOKEN")
@@ -87,9 +91,9 @@ func runPublish(cmd *cobra.Command, args []string) error {
 			user := envVars["REGISTRY_USER"]
 			token := envVars["REGISTRY_TOKEN"]
 			if user == "" || token == "" {
-				return fmt.Errorf("REGISTRY_USER and REGISTRY_TOKEN must be set in the project .env (or use --skip-login)")
+				return fmt.Errorf("REGISTRY_USER and REGISTRY_TOKEN must be set in .env (or use --skip-login)")
 			}
-			fmt.Printf("\n==> Logging in to %s...\n", registryHost)
+			fmt.Printf("==> Logging in to %s...\n", registryHost)
 			loginCmd := exec.Command("docker", "login", registryHost, "--username", user, "--password-stdin")
 			loginCmd.Stdin = strings.NewReader(token)
 			loginCmd.Stdout = os.Stdout
@@ -100,13 +104,18 @@ func runPublish(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Push
-	fmt.Println("\n==> Pushing image...")
-	pushCmd := exec.Command("docker", "push", fullRef)
-	pushCmd.Stdout = os.Stdout
-	pushCmd.Stderr = os.Stderr
-	if err := pushCmd.Run(); err != nil {
-		return fmt.Errorf("docker push failed: %w", err)
+	// Build and push (buildx --push is required for cross-platform images
+	// because the local Docker daemon can only hold native-arch images)
+	fmt.Printf("\n==> Building for %s and pushing...\n", platform)
+	buildCmd := exec.Command("docker", "buildx", "build",
+		"--platform", platform,
+		"-t", fullRef,
+		"--push",
+		".")
+	buildCmd.Stdout = os.Stdout
+	buildCmd.Stderr = os.Stderr
+	if err := buildCmd.Run(); err != nil {
+		return fmt.Errorf("docker buildx build+push failed: %w", err)
 	}
 
 	fmt.Printf("\nPublished: %s\n", fullRef)
@@ -157,6 +166,17 @@ func splitImageRef(ref string) (base, tag string) {
 		return ref[:i], ref[i+1:]
 	}
 	return ref, ""
+}
+
+func validatePlatform(platform string) error {
+	for _, p := range strings.Split(platform, ",") {
+		p = strings.TrimSpace(p)
+		parts := strings.SplitN(p, "/", 3)
+		if len(parts) < 2 {
+			return fmt.Errorf("invalid platform %q: expected os/arch (e.g. linux/amd64)", p)
+		}
+	}
+	return nil
 }
 
 func shortSHA() string {

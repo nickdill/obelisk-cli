@@ -15,15 +15,17 @@ type Module struct {
 	Type      string            `yaml:"type"`
 	Env       map[string]string `yaml:"env"`
 	Replicas  int               `yaml:"replicas"`
+	Platform  string            `yaml:"platform"`
 }
 
 type Config struct {
-	Version string             `yaml:"version"`
-	Name    string             `yaml:"name"`
-	Type    string             `yaml:"type"`
-	Image   string             `yaml:"image"`
-	Port    int                `yaml:"port"`
-	Modules map[string]*Module `yaml:"modules"`
+	Version  string             `yaml:"version"`
+	Name     string             `yaml:"name"`
+	Type     string             `yaml:"type"`
+	Image    string             `yaml:"image"`
+	Port     int                `yaml:"port"`
+	Platform string             `yaml:"platform"`
+	Modules  map[string]*Module `yaml:"modules"`
 }
 
 func IsModule() bool {

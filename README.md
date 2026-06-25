@@ -73,6 +73,9 @@ modules:
     port: 4000
     domain: docs.example.com
     type: static
+
+# Optional: target architecture for image builds
+# platform: linux/amd64,linux/arm64
 ```
 
 ```bash
@@ -146,6 +149,7 @@ obelisk deploy
 | `obelisk revoke <fingerprint>` | Revoke a key from a server |
 | `obelisk list` | Show module status across all servers |
 | `obelisk deploy` | Deploy the current module |
+| `obelisk publish` | Build and push a module image to a registry |
 
 ---
 
@@ -180,8 +184,11 @@ No manual config files. No restarting nginx by hand. No keeping compose files in
 - [x] `obelisk update [version]` — self-updating binary from GitHub Releases
 - [x] `obelisk build` / `run` / `stop` — module build and production service lifecycle
 
+### v0.3 — image publishing
+- [x] `obelisk publish` — build and push module images via `docker buildx`
+- [x] Multi-architecture support — target ARM64, x86, or both via `platform` in `obelisk.yml`
+
 ### Coming soon
-- [ ] `obelisk publish` — build and push module images to a registry
 - [ ] Key rotation and passphrase-encrypted private keys
 - [ ] Per-key permissions and scoping
 

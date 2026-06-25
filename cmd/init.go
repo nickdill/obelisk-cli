@@ -110,6 +110,7 @@ name: "my-module"
 type: module
 # image: ghcr.io/<user>/<repo>
 # port: 3000
+# platform: linux/amd64
 `
 
 const moduleBuildSHTemplate = `#!/bin/sh

@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -43,8 +44,8 @@ func runRun(cmd *cobra.Command, args []string) error {
 }
 
 func checkYQ() error {
-	if _, err := exec.LookPath("yq"); err != nil {
-		return fmt.Errorf("yq is required but not installed\n\nInstall it with:\n  # Linux / EC2:\n  sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq\n  sudo chmod +x /usr/bin/yq\n\n  # macOS:\n  brew install yq")
+	if err := exec.Command("yq", "--version").Run(); err != nil {
+		return fmt.Errorf("yq is required but not working (missing or wrong architecture)\n\nInstall it with:\n  # Linux / EC2:\n  sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_%s -O /usr/bin/yq\n  sudo chmod +x /usr/bin/yq\n\n  # macOS:\n  brew install yq", runtime.GOARCH)
 	}
 	return nil
 }
