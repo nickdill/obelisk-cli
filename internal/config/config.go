@@ -16,6 +16,8 @@ type Module struct {
 	Env       map[string]string `yaml:"env"`
 	Replicas  int               `yaml:"replicas"`
 	Platform  string            `yaml:"platform"`
+	Dist      string            `yaml:"dist"`  // static: build output dir (default ".")
+	Build     string            `yaml:"build"` // static: local build command (optional)
 }
 
 type Config struct {
@@ -25,6 +27,8 @@ type Config struct {
 	Image    string             `yaml:"image"`
 	Port     int                `yaml:"port"`
 	Platform string             `yaml:"platform"`
+	Dist     string             `yaml:"dist"`  // static: build output dir (default ".")
+	Build    string             `yaml:"build"` // static: local build command (optional)
 	Modules  map[string]*Module `yaml:"modules"`
 }
 

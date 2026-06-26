@@ -46,8 +46,8 @@ func runPublish(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("loading obelisk.yml: %w", err)
 	}
-	if cfg.Type != "module" {
-		return fmt.Errorf("publish must be run from a module directory (type: module in obelisk.yml)")
+	if cfg.Type != "module" && cfg.Type != "static" {
+		return fmt.Errorf("publish must be run from a module or static directory (type: module|static in obelisk.yml)")
 	}
 	if cfg.Image == "" {
 		return fmt.Errorf("no 'image' field in obelisk.yml — set it to your registry path, e.g. ghcr.io/<user>/%s", cfg.Name)
@@ -60,6 +60,7 @@ func runPublish(cmd *cobra.Command, args []string) error {
 	if platform == "" {
 		platform = "linux/amd64"
 	}
+	platform = normalizePlatform(platform)
 	if err := validatePlatform(platform); err != nil {
 		return err
 	}
@@ -104,14 +105,50 @@ func runPublish(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Build and push (buildx --push is required for cross-platform images
-	// because the local Docker daemon can only hold native-arch images)
+	// Static modules: build assets locally with the project's own toolchain,
+	// then package the output into a throwaway busybox "artifact image" whose
+	// /static dir the server extracts into the shared volume. Modules keep using
+	// their own Dockerfile.
+	var dockerfile string
+	if cfg.Type == "static" {
+		if cfg.Build != "" {
+			fmt.Printf("==> Building static assets: %s\n", cfg.Build)
+			b := exec.Command("sh", "-c", cfg.Build)
+			b.Stdout = os.Stdout
+			b.Stderr = os.Stderr
+			if err := b.Run(); err != nil {
+				return fmt.Errorf("static build command failed: %w", err)
+			}
+		}
+		dist := cfg.Dist
+		if dist == "" {
+			dist = "."
+		}
+		df, cleanup, err := writeStaticDockerfile(dist)
+		if err != nil {
+			return err
+		}
+		defer cleanup()
+		dockerfile = df
+	}
+
+	// Multi-platform builds require a builder with the docker-container driver.
+	// The default "docker" driver only supports single-platform.
+	buildArgs := []string{"buildx", "build", "--platform", platform, "-t", fullRef, "--push"}
+	if dockerfile != "" {
+		buildArgs = append(buildArgs, "-f", dockerfile)
+	}
+	if strings.Contains(platform, ",") {
+		builder, err := ensureMultiPlatformBuilder()
+		if err != nil {
+			return err
+		}
+		buildArgs = append(buildArgs, "--builder", builder)
+	}
+	buildArgs = append(buildArgs, ".")
+
 	fmt.Printf("\n==> Building for %s and pushing...\n", platform)
-	buildCmd := exec.Command("docker", "buildx", "build",
-		"--platform", platform,
-		"-t", fullRef,
-		"--push",
-		".")
+	buildCmd := exec.Command("docker", buildArgs...)
 	buildCmd.Stdout = os.Stdout
 	buildCmd.Stderr = os.Stderr
 	if err := buildCmd.Run(); err != nil {
@@ -160,6 +197,24 @@ func loadLocalEnv(keys ...string) map[string]string {
 	return result
 }
 
+// writeStaticDockerfile writes a throwaway Dockerfile that packages a static
+// module's built assets into a minimal busybox image at /static. busybox gives
+// the server a shell + cp/mv for the extract step in sync-static.sh.
+func writeStaticDockerfile(dist string) (path string, cleanup func(), err error) {
+	f, err := os.CreateTemp("", "obelisk-static-*.Dockerfile")
+	if err != nil {
+		return "", nil, fmt.Errorf("creating temp Dockerfile: %w", err)
+	}
+	content := fmt.Sprintf("FROM busybox\nCOPY %s /static\n", dist)
+	if _, err := f.WriteString(content); err != nil {
+		f.Close()
+		os.Remove(f.Name())
+		return "", nil, fmt.Errorf("writing temp Dockerfile: %w", err)
+	}
+	f.Close()
+	return f.Name(), func() { os.Remove(f.Name()) }, nil
+}
+
 func splitImageRef(ref string) (base, tag string) {
 	i := strings.LastIndex(ref, ":")
 	if i > 0 && !strings.Contains(ref[i+1:], "/") {
@@ -168,9 +223,32 @@ func splitImageRef(ref string) (base, tag string) {
 	return ref, ""
 }
 
+func ensureMultiPlatformBuilder() (string, error) {
+	name := "obelisk"
+	out, err := exec.Command("docker", "buildx", "inspect", name).CombinedOutput()
+	if err == nil && strings.Contains(string(out), "docker-container") {
+		return name, nil
+	}
+	fmt.Println("==> Creating multi-platform builder...")
+	create := exec.Command("docker", "buildx", "create", "--name", name, "--driver", "docker-container")
+	create.Stdout = os.Stdout
+	create.Stderr = os.Stderr
+	if err := create.Run(); err != nil {
+		return "", fmt.Errorf("failed to create buildx builder: %w\nSee https://docs.docker.com/go/build-multi-platform/", err)
+	}
+	return name, nil
+}
+
+func normalizePlatform(platform string) string {
+	parts := strings.Split(platform, ",")
+	for i, p := range parts {
+		parts[i] = strings.TrimSpace(p)
+	}
+	return strings.Join(parts, ",")
+}
+
 func validatePlatform(platform string) error {
 	for _, p := range strings.Split(platform, ",") {
-		p = strings.TrimSpace(p)
 		parts := strings.SplitN(p, "/", 3)
 		if len(parts) < 2 {
 			return fmt.Errorf("invalid platform %q: expected os/arch (e.g. linux/amd64)", p)

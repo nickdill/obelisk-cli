@@ -30,8 +30,8 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("loading obelisk.yml: %w", err)
 	}
-	if cfg.Type != "module" {
-		return fmt.Errorf("deploy must be run from a module directory (type: module in obelisk.yml)")
+	if cfg.Type != "module" && cfg.Type != "static" {
+		return fmt.Errorf("deploy must be run from a module or static directory (type: module|static in obelisk.yml)")
 	}
 
 	srv, err := resolveServer(deployServer)
@@ -41,8 +41,29 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Deploying module %q to %s ...\n", cfg.Name, srv.Name)
 
-	deployBody := map[string]string{"module": cfg.Name}
-	if deployImage != "" {
+	deployBody := map[string]any{"module": cfg.Name}
+	if cfg.Type == "static" {
+		// Static modules are delivered as an artifact image the server pulls and
+		// extracts into the shared volume. Tell the agent so, and resolve the
+		// exact image ref the same way `obelisk publish` tags it.
+		if cfg.Image == "" {
+			return fmt.Errorf("no 'image' field in obelisk.yml — static modules must declare a registry path to deploy")
+		}
+		deployBody["static"] = true
+		img := deployImage
+		if img == "" {
+			base, existingTag := splitImageRef(cfg.Image)
+			tag := existingTag
+			if tag == "" {
+				tag = shortSHA()
+			}
+			if tag == "" {
+				tag = "latest"
+			}
+			img = base + ":" + tag
+		}
+		deployBody["image"] = img
+	} else if deployImage != "" {
 		deployBody["image"] = deployImage
 	}
 	if sha := gitSHA(); sha != "" {
